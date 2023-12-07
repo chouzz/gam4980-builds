@@ -77,6 +77,8 @@ static retro_audio_sample_t     audio_cb;
 static uint16_t                 fb[(LCD_WIDTH + 1) * LCD_HEIGHT];
 
 
+static void sys_isr();
+
 static inline uint32_t PA(uint16_t addr)
 {
     uint8_t bank = addr >> 12;
@@ -358,6 +360,7 @@ static void sys_keydown(uint8_t key)
     sys.ram[_SYSCON] &= 0xf7;
     sys.ram[_KEYCODE] = key | 0x80;
     sys.ram[_ISR] |= 0x80;
+    sys_isr();
 }
 
 static void keyboard_cb(bool down, unsigned keycode,
@@ -493,6 +496,8 @@ static void sys_isr()
         return;
     if ((sys.ram[_ISR] & 0x80) && (sys.ram[_IER] & 0x80)) {
         idx = 0x02; // PI
+	sys.ram[_ISR] &= 0x7f;
+	return;
     } else if ((sys.ram[_ISR] & 0x01) && (sys.ram[_IER] & 0x01)) {
         idx = 0x13; // ALM
     } else if ((sys.ram[_ISR] & 0x02) && (sys.ram[_IER] & 0x02)) {
@@ -505,6 +510,13 @@ static void sys_isr()
         idx = 0x0f; // GTL
     }  else if ((sys.ram[_TISR] & 0x01) && (sys.ram[_TIER] & 0x01)) {
         idx = 0x03; // ST1
+	sys.ram[_TISR] &= 0xfe;
+	sys.ram[0x2018] += 1;
+	if (sys.ram[0x2018] >= sys.ram[0x2019]) {
+	    sys.ram[0x201e] |= 0x01;
+	    sys.ram[0x2018] = 0;
+	}
+	return;
     } else if ((sys.ram[_TISR] & 0x02) && (sys.ram[_TIER] & 0x02)) {
         idx = 0x04; // ST2
     } else if ((sys.ram[_TISR] & 0x04) && (sys.ram[_TIER] & 0x04)) {
@@ -526,31 +538,39 @@ static void sys_step()
 {
     uint32_t cycles = 0;
 
-    while ((sys.ram[_SYSCON] & 0x08) == 0 && cycles < 300000) {
-	for (int i = 0; i < 400; ++i) {
-	    uint16_t pc = sys.cpu->pc;
-
-	    if (pc == 0xd2f6 && PA(pc) >= 0xe00000) {
-		uint16_t func = sys.ram[__addr_reg+1] << 8 | sys.ram[__addr_reg];
-		// TODO: implement more banked functions for speed!
-		if (func == 0xe7a0) {
-		    // SysHalt
-		    if ((sys.ram[0x2021] & 0x02) == 0) {
-			sys.ram[_SYSCON] |= 0x08;
-			rts(sys.cpu, imp);
-			break;
-		    }
+    while ((sys.ram[_SYSCON] & 0x80) == 0 && cycles < 300000) {
+	uint16_t pc = sys.cpu->pc;
+	if (pc == 0xd2f6 && PA(pc) >= 0xe00000) {
+	    uint16_t func = sys.ram[__addr_reg+1] << 8 | sys.ram[__addr_reg];
+	    // TODO: implement more banked functions for speed!
+	    if (func == 0xe7a0) {
+		// SysHalt
+		if ((sys.ram[0x2021] & 0x02) == 0) {
+		    sys.ram[_SYSCON] |= 0x08;
+		    rts(sys.cpu, imp);
+		    break;
 		}
 	    }
-
-	    if (vrEmu6502GetNextOpcode(sys.cpu) == 0) {
-		// Upon BRK, shutdown the game.
-		sys.ram[_SYSCON] |= 0x08;
-		environ_cb(RETRO_ENVIRONMENT_SHUTDOWN, NULL);
+	    if (func == 0x0e7c1) {
+		// SysGetKey
+		if (sys.ram[_KEYCODE] & 0x80) {
+		    sys.cpu->ac = sys.ram[_KEYCODE] & 0x3f;
+		    sys.ram[_KEYCODE] = 0;
+		} else {
+		    sys.cpu->ac = 0xff;
+		}
+		rts(sys.cpu, imp);
 		break;
 	    }
-	    cycles += vrEmu6502InstCycle(sys.cpu);
 	}
+
+	if (vrEmu6502GetNextOpcode(sys.cpu) == 0) {
+	    // Upon BRK, shutdown the game.
+	    sys.ram[_SYSCON] |= 0x08;
+	    environ_cb(RETRO_ENVIRONMENT_SHUTDOWN, NULL);
+	    break;
+	}
+	cycles += vrEmu6502InstCycle(sys.cpu);
     }
 }
 
