@@ -65,6 +65,7 @@ static struct {
     uint8_t      rom_e[0x200000];       /* os rom */
     uint8_t      bk_sel;
     uint16_t     bk_tab[16];
+    uint16_t     bk_sys_d;
 } sys;
 
 static void fallback_log(enum retro_log_level level, const char *fmt, ...);
@@ -220,6 +221,10 @@ static uint8_t mem_read(uint16_t addr, bool isDbg)
         }
     }
 
+    // Never return 0 for AutoPowerOffCount to prevent poweroff.
+    if (addr == 0x2028)
+        return 0xff;
+
     if (addr >= 0x300 && addr < 0x400) {
         return sys.rom_e[0x1fff00 + addr - 0x300];
     } else if (paddr < 0x8000) {
@@ -234,6 +239,11 @@ static uint8_t mem_read(uint16_t addr, bool isDbg)
 	// Invalid read.
         return 0x00;
     }
+}
+
+static uint16_t mem_read16(uint16_t addr)
+{
+    return mem_read(addr, false) | mem_read(addr + 1, false) << 8;
 }
 
 static void mem_write(uint16_t addr, uint8_t val)
@@ -396,6 +406,7 @@ static void sys_init()
     while (!(sys.cpu->pc == 0xd2f6 &&
              sys.ram[__addr_reg] == 0x37 && sys.ram[__addr_reg+1] == 0xe7))
         vrEmu6502InstCycle(sys.cpu);
+    sys.bk_sys_d = sys.bk_tab[0xd];
 }
 
 static void sys_deinit()
@@ -539,30 +550,33 @@ static void sys_step()
     uint32_t cycles = 0;
 
     while ((sys.ram[_SYSCON] & 0x80) == 0 && cycles < 300000) {
-	uint16_t pc = sys.cpu->pc;
-	if (pc == 0xd2f6 && PA(pc) >= 0xe00000) {
-	    uint16_t func = sys.ram[__addr_reg+1] << 8 | sys.ram[__addr_reg];
-	    // TODO: implement more banked functions for speed!
-	    if (func == 0xe7a0) {
-		// SysHalt
-		if ((sys.ram[0x2021] & 0x02) == 0) {
-		    sys.ram[_SYSCON] |= 0x08;
-		    rts(sys.cpu, imp);
-		    break;
-		}
-	    }
-	    if (func == 0x0e7c1) {
-		// SysGetKey
-		if (sys.ram[_KEYCODE] & 0x80) {
-		    sys.cpu->ac = sys.ram[_KEYCODE] & 0x3f;
-		    sys.ram[_KEYCODE] = 0;
-		} else {
-		    sys.cpu->ac = 0xff;
-		}
-		rts(sys.cpu, imp);
-		break;
-	    }
-	}
+        if (sys.bk_tab[0xd] == sys.bk_sys_d &&
+            vrEmu6502GetNextOpcode(sys.cpu) == 0x20) { // JSR $xxxx
+            // High level emulation for system functions.
+            uint16_t func = mem_read16(sys.cpu->pc + 1);
+            if (func == 0xd2f6) { // __banked_function_call
+                func = mem_read16(__addr_reg);
+                if (func == 0xe7a0) {
+                    // SysHalt
+                    if ((sys.ram[0x2021] & 0x02) == 0) {
+                        sys.ram[_SYSCON] |= 0x08;
+                    }
+                    sys.cpu->pc += 3;
+                    break;
+                }
+                if (func == 0xe7c1) {
+                    // SysGetKey
+                    if (sys.ram[_KEYCODE] & 0x80) {
+                        sys.cpu->ac = sys.ram[_KEYCODE] & 0x3f;
+                        sys.ram[_KEYCODE] = 0;
+                    } else {
+                        sys.cpu->ac = 0xff;
+                    }
+                    sys.cpu->pc += 3;
+                    continue;
+                }
+            }
+        }
 
 	if (vrEmu6502GetNextOpcode(sys.cpu) == 0) {
 	    // Upon BRK, shutdown the game.
@@ -609,7 +623,7 @@ void retro_set_environment(retro_environment_t cb)
     };
     static struct retro_frame_time_callback frame = {
         .callback = frame_cb,
-        .reference = 0,
+        .reference = 1000000 / 60,
     };
     environ_cb = cb;
     if (environ_cb(RETRO_ENVIRONMENT_GET_LOG_INTERFACE, &log))
