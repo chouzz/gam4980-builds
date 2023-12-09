@@ -381,20 +381,21 @@ static void keyboard_cb(bool down, unsigned keycode,
     sys_keydown(_kbdk[keycode]);
 }
 
-static void sys_init()
+static void sys_init(const char *romdir)
 {
+    char path[80];
     FILE *stream;
-    stream = fopen("2.BIN", "r");
-    fread(sys.flash, 0x200000, 1, stream);
-    fclose(stream);
-    stream = fopen("8.BIN", "r");
+    snprintf(path, 80, "%s/8.BIN", romdir);
+    stream = fopen(path, "r");
     fread(sys.rom_8, 0x200000, 1, stream);
     fclose(stream);
-    stream = fopen("E.BIN", "r");
+    snprintf(path, 80, "%s/E.BIN", romdir);
+    stream = fopen(path, "r");
     fread(sys.rom_e, 0x200000, 1, stream);
     fclose(stream);
 
     memset(sys.ram, 0x00, 0x8000);
+    memset(sys.flash, 0xff, 0x200000);
     sys.flash_cmd = 0;
     sys.flash_cycles = 0;
     sys.ram[_INCR] = 0x0f;
@@ -421,7 +422,6 @@ static void sys_load(const uint8_t *gam, size_t size)
 
     // Load game into 0x205000.
     // TODO: Handle file headers and saves.
-    memset(sys.flash, 0xff, 0x200000);
     memcpy(sys.flash+0x5000, gam, size);
     // Setup banks for the game.
     sys.bk_tab[0x5] = 0x205;
@@ -616,7 +616,6 @@ static void frame_cb(retro_usec_t usec)
 
 void retro_set_environment(retro_environment_t cb)
 {
-    static bool yes = true;
     static struct retro_log_callback log;
     static struct retro_keyboard_callback kbd = {
         .callback = keyboard_cb,
@@ -628,7 +627,6 @@ void retro_set_environment(retro_environment_t cb)
     environ_cb = cb;
     if (environ_cb(RETRO_ENVIRONMENT_GET_LOG_INTERFACE, &log))
         log_cb = log.log;
-    environ_cb(RETRO_ENVIRONMENT_SET_SUPPORT_NO_GAME, &yes);
     environ_cb(RETRO_ENVIRONMENT_SET_FRAME_TIME_CALLBACK, &frame);
     environ_cb(RETRO_ENVIRONMENT_SET_KEYBOARD_CALLBACK, &kbd);
 }
@@ -682,7 +680,11 @@ void retro_get_system_av_info(struct retro_system_av_info *info)
 
 void retro_init(void)
 {
-    sys_init();
+    char *systemdir;
+    char romdir[80];
+    environ_cb(RETRO_ENVIRONMENT_GET_SYSTEM_DIRECTORY, &systemdir);
+    snprintf(romdir, 80, "%s/gam4980", systemdir);
+    sys_init(romdir);
 }
 
 bool retro_load_game(const struct retro_game_info *game)
