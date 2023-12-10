@@ -59,6 +59,8 @@
 
 static struct {
     VrEmu6502   *cpu;
+    uint8_t    (*mem_r[0x100])(uint16_t);
+    void       (*mem_w[0x100])(uint16_t, uint8_t);
     uint8_t      ram[0x8000];
     uint8_t      flash[0x200000];
     uint8_t      flash_cmd;
@@ -81,6 +83,7 @@ static uint16_t                 fb[(LCD_WIDTH + 1) * LCD_HEIGHT];
 
 
 static void sys_isr();
+static void mem_bs(uint8_t sel);
 
 static inline uint32_t PA(uint16_t addr)
 {
@@ -183,64 +186,208 @@ static void flash_write(uint32_t addr, uint8_t val)
     }
 }
 
-static uint8_t mem_read(uint16_t addr, bool isDbg)
+static uint8_t invalid_read(uint16_t addr)
 {
-    uint32_t paddr = PA(addr);
+    return 0x00;
+}
 
-    if ((addr < 0x20) || (addr >= 0x200 && addr < 0x2e0)) {
-        switch (addr) {
-        case _DATA1:
-        case _DATA2:
-        case _DATA3:
-        case _DATA4: {
-            int _L = _ADDR1L + addr * 3;
-            int _M = _L + 1;
-            int _H = _M + 1;
-            paddr = sys.ram[_L] | sys.ram[_M] << 8 | sys.ram[_H] << 16;
-            if (sys.ram[_INCR] & (1 << addr)) {
-                sys.ram[_L] += 1;
-                if (sys.ram[_L] == 0) {
-                    sys.ram[_M] += 1;
-                    if (sys.ram[_M] == 0) {
-                        sys.ram[_H] += 1;
-                    }
-                }
-            }
-            break;
-        }
-        case _BK_SEL:
-            return sys.bk_sel;
-        case _BK_ADRL:
-            return sys.bk_tab[sys.bk_sel] & 0xff;
-        case _BK_ADRH:
-            return sys.bk_tab[sys.bk_sel] >> 8;
-        case _PB:
-            // XXX: Disable ROM (0x400000-0x7fffff) channels and audio.
-            return 0;
-        case _MACCTL:
-	    // XXX: Return BRK for game exit.
-            return 0;
-        }
-    }
+static void invalid_write(uint16_t addr, uint8_t val)
+{
+}
+
+static uint8_t ram_read(uint16_t addr)
+{
+    return sys.ram[addr];
+}
+
+static void ram_write(uint16_t addr, uint8_t val)
+{
+    sys.ram[addr] = val;
+
+    // XXX: Disable ROM (0x400000-0x7fffff) channels and audio.
+    if (addr == _PB)
+        sys.ram[addr] = 0;
 
     // Never return 0 for AutoPowerOffCount to prevent poweroff.
     if (addr == 0x2028)
-        return 0xff;
+        sys.ram[addr] = 0xff;
+}
 
-    if (addr >= 0x300 && addr < 0x400) {
-        return sys.rom_e[0x1fff00 + addr - 0x300];
-    } else if (paddr < 0x8000) {
-        return sys.ram[paddr];
-    } else if (paddr >= 0x200000 && paddr < 0x400000) {
-        return flash_read(paddr - 0x200000);
-    } else if (paddr >= 0x800000 && paddr < 0xa00000) {
-        return sys.rom_8[paddr - 0x800000];
-    } else if (paddr >= 0xe00000 && paddr < 0x1000000) {
-        return sys.rom_e[paddr - 0xe00000];
-    } else {
-	// Invalid read.
-        return 0x00;
+static uint8_t direct_read(uint16_t addr)
+{
+    int _L = _ADDR1L + addr * 3;
+    int _M = _L + 1;
+    int _H = _M + 1;
+    uint32_t paddr = sys.ram[_L] | sys.ram[_M] << 8 | sys.ram[_H] << 16;
+    if (sys.ram[_INCR] & (1 << addr)) {
+        sys.ram[_L] += 1;
+        if (sys.ram[_L] == 0) {
+            sys.ram[_M] += 1;
+            if (sys.ram[_M] == 0) {
+                sys.ram[_H] += 1;
+            }
+        }
     }
+    if (paddr < 0x8000)
+        return ram_read(paddr & 0x7fff);
+    else if (paddr >= 0x200000 && paddr < 0x400000)
+        return flash_read(paddr - 0x200000);
+    else if (paddr >= 0x800000 && paddr < 0xa00000)
+        return sys.rom_8[paddr - 0x800000];
+    else if (paddr >= 0xe00000 && paddr < 0x1000000)
+        return sys.rom_e[paddr - 0xe00000];
+    else
+        return 0x00;
+}
+
+static void direct_write(uint16_t addr, uint8_t val)
+{
+    int _L = _ADDR1L + addr * 3;
+    int _M = _L + 1;
+    int _H = _M + 1;
+    uint32_t paddr = sys.ram[_L] | sys.ram[_M] << 8 | sys.ram[_H] << 16;
+    if (sys.ram[_INCR] & (1 << addr)) {
+        sys.ram[_L] += 1;
+        if (sys.ram[_L] == 0) {
+            sys.ram[_M] += 1;
+            if (sys.ram[_M] == 0) {
+                sys.ram[_H] += 1;
+            }
+        }
+    }
+    if (paddr < 0x8000)
+        ram_write(paddr & 0x7fff, val);
+    else if (paddr >= 0x200000 && paddr < 0x400000)
+        flash_write(paddr - 0x200000, val);
+}
+
+static uint8_t page0_read(uint16_t addr)
+{
+    switch (addr) {
+    case _DATA1:
+    case _DATA2:
+    case _DATA3:
+    case _DATA4:
+        return direct_read(addr);
+    case _BK_SEL:
+        return sys.bk_sel;
+    case _BK_ADRL:
+        return sys.bk_tab[sys.bk_sel] & 0xff;
+    case _BK_ADRH:
+        return sys.bk_tab[sys.bk_sel] >> 8;
+    }
+    return sys.ram[addr];
+}
+
+static void page0_write(uint16_t addr, uint8_t val)
+{
+    switch (addr) {
+    case _DATA1:
+    case _DATA2:
+    case _DATA3:
+    case _DATA4:
+        direct_write(addr, val);
+        return;
+    case _ISR:
+        sys.ram[_ISR] &= val;
+        return;
+    case _TISR:
+        sys.ram[_TISR] &= val;
+        return;
+    case _BK_SEL:
+        sys.bk_sel = val & 0x0f;
+        return;
+    case _BK_ADRL:
+        sys.bk_tab[sys.bk_sel] &= 0xff00;
+        sys.bk_tab[sys.bk_sel] |= val;
+        mem_bs(sys.bk_sel);
+        return;
+    case _BK_ADRH:
+        sys.bk_tab[sys.bk_sel] &= 0x00ff;
+        sys.bk_tab[sys.bk_sel] |= (val & 0x0f) << 8;
+        mem_bs(sys.bk_sel);
+        return;
+    }
+    sys.ram[addr] = val;
+}
+
+static uint8_t page3_read(uint16_t addr)
+{
+    return sys.rom_e[0x1fff00 + addr - 0x300];
+}
+
+static void mem_init()
+{
+    for (int i = 0; i < 0x100; i += 1) {
+        sys.mem_r[i] = invalid_read;
+        sys.mem_w[i] = invalid_write;
+    }
+    for (int i = 0; i < 16; i += 1) {
+        sys.mem_r[i] = ram_read;
+        sys.mem_w[i] = ram_write;
+    }
+    sys.mem_r[0x00] = page0_read;
+    sys.mem_w[0x00] = page0_write;
+    sys.mem_r[0x03] = page3_read;
+    sys.mem_w[0x03] = invalid_write;
+}
+
+static uint8_t flash_vread(uint16_t addr)
+{
+    return flash_read(PA(addr) - 0x200000);
+}
+
+static void flash_vwrite(uint16_t addr, uint8_t val)
+{
+    return flash_write(PA(addr) - 0x200000, val);
+}
+
+static uint8_t rom_8_vread(uint16_t addr)
+{
+    return sys.rom_8[PA(addr) - 0x800000];
+}
+
+static uint8_t rom_e_vread(uint16_t addr)
+{
+    return sys.rom_e[PA(addr) - 0xe00000];
+}
+
+static void mem_bs(uint8_t sel)
+{
+    uint32_t paddr = PA(sel * 0x1000);
+    if (sel == 0)
+	return;
+    if (paddr < 0x8000) {
+        for (int i = 0; i < 16; i += 1) {
+            sys.mem_r[sel * 16 + i] = ram_read;
+            sys.mem_w[sel * 16 + i] = ram_write;
+        }
+    } else if (paddr >= 0x200000 && paddr < 0x400000) {
+        for (int i = 0; i < 16; i += 1) {
+            sys.mem_r[sel * 16 + i] = flash_vread;
+            sys.mem_w[sel * 16 + i] = flash_vwrite;
+        }
+    } else if (paddr >= 0x800000 && paddr < 0xa00000) {
+        for (int i = 0; i < 16; i += 1) {
+            sys.mem_r[sel * 16 + i] = rom_8_vread;
+            sys.mem_w[sel * 16 + i] = invalid_write;
+        }
+    } else if (paddr >= 0xe00000 && paddr < 0x1000000) {
+        for (int i = 0; i < 16; i += 1) {
+            sys.mem_r[sel * 16 + i] = rom_e_vread;
+            sys.mem_w[sel * 16 + i] = invalid_write;
+        }
+    } else {
+        for (int i = 0; i < 16; i += 1) {
+            sys.mem_r[sel * 16 + i] = invalid_read;
+            sys.mem_w[sel * 16 + i] = invalid_write;
+        }
+    }
+}
+
+static uint8_t mem_read(uint16_t addr, bool isDbg)
+{
+    return sys.mem_r[addr >> 8](addr);
 }
 
 static uint16_t mem_read16(uint16_t addr)
@@ -250,56 +397,7 @@ static uint16_t mem_read16(uint16_t addr)
 
 static void mem_write(uint16_t addr, uint8_t val)
 {
-    uint32_t paddr = PA(addr);
-
-    if ((addr < 0x20) || (addr >= 0x200 && addr < 0x2e0)) {
-        switch (addr) {
-        case _DATA1:
-        case _DATA2:
-        case _DATA3:
-        case _DATA4: {
-            int _L = _ADDR1L + addr * 3;
-            int _M = _L + 1;
-            int _H = _M + 1;
-            paddr = sys.ram[_L] | sys.ram[_M] << 8 | sys.ram[_H] << 16;
-            if (sys.ram[_INCR] & (1 << addr)) {
-                sys.ram[_L] += 1;
-                if (sys.ram[_L] == 0) {
-                    sys.ram[_M] += 1;
-                    if (sys.ram[_M] == 0) {
-                        sys.ram[_H] += 1;
-                    }
-                }
-            }
-            break;
-        }
-        case _ISR:
-            sys.ram[_ISR] &= val;
-            return;
-        case _TISR:
-            sys.ram[_TISR] &= val;
-            return;
-        case _BK_SEL:
-            sys.bk_sel = val & 0x0f;
-            return;
-        case _BK_ADRL:
-            sys.bk_tab[sys.bk_sel] &= 0xff00;
-            sys.bk_tab[sys.bk_sel] |= val;
-            return;
-        case _BK_ADRH:
-            sys.bk_tab[sys.bk_sel] &= 0x00ff;
-            sys.bk_tab[sys.bk_sel] |= (val & 0x0f) << 8;
-            return;
-        }
-    }
-
-    if (paddr < 0x8000) {
-        sys.ram[paddr] = val;
-    } else if (paddr >= 0x200000 && paddr < 0x400000) {
-        flash_write(paddr - 0x200000, val);
-    } else {
-	// Invalid write.
-    }
+    return sys.mem_w[addr >> 8](addr, val);
 }
 
 enum _key {
@@ -402,6 +500,7 @@ static void sys_init(const char *romdir)
     sys.flash_cycles = 0;
     sys.ram[_INCR] = 0x0f;
 
+    mem_init();
     sys.cpu = vrEmu6502New(CPU_6502, mem_read, mem_write);
     vrEmu6502SetPC(sys.cpu, 0x0350);
 
@@ -434,6 +533,8 @@ static void sys_load(const uint8_t *gam, size_t size)
     sys.bk_tab[0xa] = sys.bk_tab[0x09] + 1;
     sys.bk_tab[0xb] = sys.bk_tab[0x09] + 2;
     sys.bk_tab[0xc] = sys.bk_tab[0x09] + 3;
+    for (int i = 0x05; i <= 0x0c; i += 1)
+        mem_bs(i);
     mem_write(0x2029, 0x05);
     mem_write(0x202a, 0x02);
     // Push game return address, 0x0260=BRK.
@@ -509,8 +610,8 @@ static void sys_isr()
         return;
     if ((sys.ram[_ISR] & 0x80) && (sys.ram[_IER] & 0x80)) {
         idx = 0x02; // PI
-	sys.ram[_ISR] &= 0x7f;
-	return;
+        sys.ram[_ISR] &= 0x7f;
+        return;
     } else if ((sys.ram[_ISR] & 0x01) && (sys.ram[_IER] & 0x01)) {
         idx = 0x13; // ALM
     } else if ((sys.ram[_ISR] & 0x02) && (sys.ram[_IER] & 0x02)) {
@@ -523,13 +624,13 @@ static void sys_isr()
         idx = 0x0f; // GTL
     }  else if ((sys.ram[_TISR] & 0x01) && (sys.ram[_TIER] & 0x01)) {
         idx = 0x03; // ST1
-	sys.ram[_TISR] &= 0xfe;
-	sys.ram[0x2018] += 1;
-	if (sys.ram[0x2018] >= sys.ram[0x2019]) {
-	    sys.ram[0x201e] |= 0x01;
-	    sys.ram[0x2018] = 0;
-	}
-	return;
+        sys.ram[_TISR] &= 0xfe;
+        sys.ram[0x2018] += 1;
+        if (sys.ram[0x2018] >= sys.ram[0x2019]) {
+            sys.ram[0x201e] |= 0x01;
+            sys.ram[0x2018] = 0;
+        }
+        return;
     } else if ((sys.ram[_TISR] & 0x02) && (sys.ram[_TIER] & 0x02)) {
         idx = 0x04; // ST2
     } else if ((sys.ram[_TISR] & 0x04) && (sys.ram[_TIER] & 0x04)) {
@@ -589,13 +690,13 @@ static void sys_step()
             }
         }
 
-	if (vrEmu6502GetNextOpcode(sys.cpu) == 0) {
-	    // Upon BRK, shutdown the game.
-	    sys.ram[_SYSCON] |= 0x08;
-	    environ_cb(RETRO_ENVIRONMENT_SHUTDOWN, NULL);
-	    break;
-	}
-	cycles += vrEmu6502InstCycle(sys.cpu);
+        if (vrEmu6502GetNextOpcode(sys.cpu) == 0) {
+            // Upon BRK, shutdown the game.
+            sys.ram[_SYSCON] |= 0x08;
+            environ_cb(RETRO_ENVIRONMENT_SHUTDOWN, NULL);
+            break;
+        }
+        cycles += vrEmu6502InstCycle(sys.cpu);
     }
 }
 
