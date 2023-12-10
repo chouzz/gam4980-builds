@@ -59,8 +59,9 @@
 
 static struct {
     VrEmu6502   *cpu;
-    uint8_t    (*mem_r[0x100])(uint16_t);
-    void       (*mem_w[0x100])(uint16_t, uint8_t);
+    uint8_t     *mem_r[0x100];
+    uint8_t    (*mem_ir[0x100])(uint16_t);
+    void       (*mem_iw[0x100])(uint16_t, uint8_t);
     uint8_t      ram[0x8000];
     uint8_t      flash[0x200000];
     uint8_t      flash_cmd;
@@ -319,17 +320,20 @@ static uint8_t page3_read(uint16_t addr)
 static void mem_init()
 {
     for (int i = 0; i < 0x100; i += 1) {
-        sys.mem_r[i] = invalid_read;
-        sys.mem_w[i] = invalid_write;
+        sys.mem_r[i] = 0;
+        sys.mem_ir[i] = invalid_read;
+        sys.mem_iw[i] = invalid_write;
     }
     for (int i = 0; i < 16; i += 1) {
-        sys.mem_r[i] = ram_read;
-        sys.mem_w[i] = ram_write;
+        /* sys.mem_r[i] = sys.ram + i * 0x100; */
+        sys.mem_ir[i] = ram_read;
+        sys.mem_iw[i] = ram_write;
     }
-    sys.mem_r[0x00] = page0_read;
-    sys.mem_w[0x00] = page0_write;
-    sys.mem_r[0x03] = page3_read;
-    sys.mem_w[0x03] = invalid_write;
+    sys.mem_ir[0x00] = page0_read;
+    sys.mem_iw[0x00] = page0_write;
+    sys.mem_r[0x03] = 0;
+    sys.mem_ir[0x03] = page3_read;
+    sys.mem_iw[0x03] = invalid_write;
 }
 
 static uint8_t flash_vread(uint16_t addr)
@@ -356,38 +360,47 @@ static void mem_bs(uint8_t sel)
 {
     uint32_t paddr = PA(sel * 0x1000);
     if (sel == 0)
-	return;
+        return;
     if (paddr < 0x8000) {
         for (int i = 0; i < 16; i += 1) {
-            sys.mem_r[sel * 16 + i] = ram_read;
-            sys.mem_w[sel * 16 + i] = ram_write;
+            sys.mem_r[sel * 16 + i] = sys.ram + paddr + i * 0x100;
+            sys.mem_ir[sel * 16 + i] = ram_read;
+            sys.mem_iw[sel * 16 + i] = ram_write;
         }
     } else if (paddr >= 0x200000 && paddr < 0x400000) {
         for (int i = 0; i < 16; i += 1) {
-            sys.mem_r[sel * 16 + i] = flash_vread;
-            sys.mem_w[sel * 16 + i] = flash_vwrite;
+            sys.mem_r[sel * 16 + i] = 0;
+            sys.mem_ir[sel * 16 + i] = flash_vread;
+            sys.mem_iw[sel * 16 + i] = flash_vwrite;
         }
     } else if (paddr >= 0x800000 && paddr < 0xa00000) {
         for (int i = 0; i < 16; i += 1) {
-            sys.mem_r[sel * 16 + i] = rom_8_vread;
-            sys.mem_w[sel * 16 + i] = invalid_write;
+            sys.mem_r[sel * 16 + i] = sys.rom_8 + paddr - 0x800000 + i * 0x100;
+            sys.mem_ir[sel * 16 + i] = rom_8_vread;
+            sys.mem_iw[sel * 16 + i] = invalid_write;
         }
     } else if (paddr >= 0xe00000 && paddr < 0x1000000) {
         for (int i = 0; i < 16; i += 1) {
-            sys.mem_r[sel * 16 + i] = rom_e_vread;
-            sys.mem_w[sel * 16 + i] = invalid_write;
+            sys.mem_r[sel * 16 + i] = sys.rom_e + paddr - 0xe00000 + i * 0x100;
+            sys.mem_ir[sel * 16 + i] = rom_e_vread;
+            sys.mem_iw[sel * 16 + i] = invalid_write;
         }
     } else {
         for (int i = 0; i < 16; i += 1) {
-            sys.mem_r[sel * 16 + i] = invalid_read;
-            sys.mem_w[sel * 16 + i] = invalid_write;
+            sys.mem_r[sel * 16 + i] = 0;
+            sys.mem_ir[sel * 16 + i] = invalid_read;
+            sys.mem_iw[sel * 16 + i] = invalid_write;
         }
     }
 }
 
 static uint8_t mem_read(uint16_t addr, bool isDbg)
 {
-    return sys.mem_r[addr >> 8](addr);
+    uint8_t page = addr >> 8;
+    if (sys.mem_r[page])
+        return sys.mem_r[page][addr & 0xff];
+    else
+        return sys.mem_ir[page](addr);
 }
 
 static uint16_t mem_read16(uint16_t addr)
@@ -397,7 +410,7 @@ static uint16_t mem_read16(uint16_t addr)
 
 static void mem_write(uint16_t addr, uint8_t val)
 {
-    return sys.mem_w[addr >> 8](addr, val);
+    return sys.mem_iw[addr >> 8](addr, val);
 }
 
 enum _key {
