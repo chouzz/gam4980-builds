@@ -14,6 +14,8 @@
 #define _BK_ADRL        0x0d
 #define _BK_ADRH        0x0e
 #define _IRCNT          0x1b
+#define __oper1         0x20
+#define __oper2         0x23
 #define __addr_reg      0x26
 #define _SYSCON         0x200
 #define _INCR           0x207
@@ -575,6 +577,15 @@ static void sys_step()
                     sys.cpu->pc += 3;
                     continue;
                 }
+            }
+            if (func == 0xd340) {
+                // __cmp_int
+                uint16_t op1 = mem_read16(__oper1);
+                uint16_t op2 = mem_read16(__oper2);
+                setOrClearBit(sys.cpu, FlagZ, op1 == op2);
+                setOrClearBit(sys.cpu, FlagC, op1 >= op2);
+                sys.cpu->ac = sys.cpu->flags;
+                sys.cpu->pc += 3;
             }
         }
 
