@@ -312,11 +312,6 @@ static void page0_write(uint16_t addr, uint8_t val)
     sys.ram[addr] = val;
 }
 
-static uint8_t page3_read(uint16_t addr)
-{
-    return sys.rom_e[0x1fff00 + addr - 0x300];
-}
-
 static void mem_init()
 {
     for (int i = 0; i < 0x100; i += 1) {
@@ -324,15 +319,14 @@ static void mem_init()
         sys.mem_ir[i] = invalid_read;
         sys.mem_iw[i] = invalid_write;
     }
-    for (int i = 0; i < 16; i += 1) {
-        /* sys.mem_r[i] = sys.ram + i * 0x100; */
+    for (int i = 1; i < 16; i += 1) {
+        sys.mem_r[i] = sys.ram + i * 0x100;
         sys.mem_ir[i] = ram_read;
         sys.mem_iw[i] = ram_write;
     }
     sys.mem_ir[0x00] = page0_read;
     sys.mem_iw[0x00] = page0_write;
-    sys.mem_r[0x03] = 0;
-    sys.mem_ir[0x03] = page3_read;
+    sys.mem_r[0x03] = sys.rom_e + 0x1fff00;
     sys.mem_iw[0x03] = invalid_write;
 }
 
@@ -356,6 +350,16 @@ static uint8_t rom_e_vread(uint16_t addr)
     return sys.rom_e[PA(addr) - 0xe00000];
 }
 
+static uint8_t ram_vread(uint16_t addr)
+{
+    return ram_read(PA(addr));
+}
+
+static void ram_vwrite(uint16_t addr, uint8_t val)
+{
+    ram_write(PA(addr), val);
+}
+
 static void mem_bs(uint8_t sel)
 {
     uint32_t paddr = PA(sel * 0x1000);
@@ -364,8 +368,8 @@ static void mem_bs(uint8_t sel)
     if (paddr < 0x8000) {
         for (int i = 0; i < 16; i += 1) {
             sys.mem_r[sel * 16 + i] = sys.ram + paddr + i * 0x100;
-            sys.mem_ir[sel * 16 + i] = ram_read;
-            sys.mem_iw[sel * 16 + i] = ram_write;
+            sys.mem_ir[sel * 16 + i] = ram_vread;
+            sys.mem_iw[sel * 16 + i] = ram_vwrite;
         }
     } else if (paddr >= 0x200000 && paddr < 0x400000) {
         for (int i = 0; i < 16; i += 1) {
