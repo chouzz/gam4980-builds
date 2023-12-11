@@ -563,7 +563,7 @@ static void sys_load(const uint8_t *gam, size_t size)
     sys.flash[0x1002] = 0x04;
     sys.flash[0x1003] = 0x04;
     sys.flash[0x1004] = 0x04;
-    // Last 8 KiB for save file.
+    // Last 32 KiB for save file.
     sys.flash[0x10f8] = 0x02;
     sys.flash[0x10f9] = 0x02;
     sys.flash[0x10fa] = 0x02;
