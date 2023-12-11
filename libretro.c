@@ -63,7 +63,7 @@ static struct {
     uint8_t    (*mem_ir[0x100])(uint16_t);
     void       (*mem_iw[0x100])(uint16_t, uint8_t);
     uint8_t      ram[0x8000];
-    uint8_t      flash[0x200000];
+    uint8_t      flash[0x100000];
     uint8_t      flash_cmd;
     uint8_t      flash_cycles;
     uint8_t      rom_8[0x200000];       /* font rom */
@@ -94,14 +94,15 @@ static inline uint32_t PA(uint16_t addr)
 
 static uint8_t flash_read(uint32_t addr)
 {
+    addr = addr & 0xfffff;
     static uint8_t flash_info[0x35] = {
         0xbf, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
         0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
         0x51, 0x52, 0x59, 0x01, 0x07, 0x00, 0x00, 0x00,
         0x00, 0x00, 0x00, 0x27, 0x36, 0x00, 0x00, 0x04,
-        0x00, 0x04, 0x06, 0x01, 0x00, 0x01, 0x01, 0x15,
-        0x00, 0x00, 0x00, 0x00, 0x02, 0xff, 0x01, 0x10,
-        0x00, 0x1f, 0x00, 0x00, 0x01,
+        0x00, 0x04, 0x06, 0x01, 0x00, 0x01, 0x01, 0x14,
+        0x00, 0x00, 0x00, 0x00, 0x02, 0xff, 0x00, 0x10,
+        0x00, 0x0f, 0x00, 0x00, 0x01,
     };
     if (sys.flash_cmd == 0 || sys.flash_cmd == 1)
         return sys.flash[addr];
@@ -112,6 +113,7 @@ static uint8_t flash_read(uint32_t addr)
 
 static void flash_write(uint32_t addr, uint8_t val)
 {
+    addr = addr & 0xfffff;
     switch (sys.flash_cycles) {
     case 0:
         // 1st Bus Write Cycle
@@ -512,7 +514,7 @@ static void sys_init(const char *romdir)
     fclose(stream);
 
     memset(sys.ram, 0x00, 0x8000);
-    memset(sys.flash, 0xff, 0x200000);
+    memset(sys.flash, 0xff, 0x100000);
     sys.flash_cmd = 0;
     sys.flash_cycles = 0;
     sys.ram[_INCR] = 0x0f;
@@ -537,10 +539,42 @@ static void sys_load(const uint8_t *gam, size_t size)
 {
     uint16_t start = gam[0x40] | (gam[0x41] << 8);
     uint32_t data = gam[0x42] | gam[0x43] << 8 | gam[0x44] << 16 | gam[0x45] << 24;
-
+    uint8_t sys_hdr[16] = {
+	0x20, 0x00,
+	0x00, 0x00, 0x00, 0x00, 0x00,
+	0x00, 0x00, 0x00, 0x00, 0x00,
+	0x00, 0x10, 0x00, 0x2f,
+    };
+    uint8_t gam_hdr[16] = {
+	0x50, 0x00,
+	0x00, 0x00, 0x00, 0x00, 0x00,
+	0x00, 0x00, 0x00, 0x00, 0x00,
+	size & 0xff, (size >> 8) & 0xff, (size >> 16) * 0xff,
+	0x3d,
+    };
+    // Setup file headers.
+    memcpy(gam_hdr + 2, gam + 6, 0x0a);
+    memcpy(sys.flash, sys_hdr, 16);
+    memcpy(sys.flash+16, gam_hdr, 16);
     // Load game into 0x205000.
-    // TODO: Handle file headers and saves.
     memcpy(sys.flash+0x5000, gam, size);
+    sys.flash[0x1000] = 0x04;
+    sys.flash[0x1001] = 0x04;
+    sys.flash[0x1002] = 0x04;
+    sys.flash[0x1003] = 0x04;
+    sys.flash[0x1004] = 0x04;
+    // Last 8 KiB for save file.
+    sys.flash[0x10f8] = 0x02;
+    sys.flash[0x10f9] = 0x02;
+    sys.flash[0x10fa] = 0x02;
+    sys.flash[0x10fb] = 0x02;
+    sys.flash[0x10fc] = 0x02;
+    sys.flash[0x10fd] = 0x02;
+    sys.flash[0x10fe] = 0x03;
+    sys.flash[0x10ff] = 0x02;
+    for (int i = 0; i < (size + 0xfff) >> 12; i += 1) {
+	sys.flash[0x1005 + i] = 0x01;
+    }
     // Setup banks for the game.
     sys.bk_tab[0x5] = 0x205;
     sys.bk_tab[0x6] = 0x206;
@@ -920,10 +954,20 @@ unsigned retro_get_region(void)
 
 void *retro_get_memory_data(unsigned id)
 {
-    return NULL;
+    switch (id) {
+    case RETRO_MEMORY_SAVE_RAM:
+	return sys.flash + 0xf8000;
+    default:
+	return NULL;
+    }
 }
 
 size_t retro_get_memory_size(unsigned id)
 {
-    return 0;
+    switch (id) {
+    case RETRO_MEMORY_SAVE_RAM:
+	return 0x8000;
+    default:
+	return 0;
+    }
 }
