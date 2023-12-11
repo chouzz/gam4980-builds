@@ -1,0 +1,24 @@
+# Software Information
+display_name = "GAM4980"
+display_version = "0.1"
+authors = ""
+categories = "Emulator"
+license = "GPLv3+"
+permissions = ""
+supported_extensions = "gam"
+
+# Hardware Information
+manufacturer = "BBK Electronics"
+systemname = "Longman 4980"
+systemid = "gam4980"
+
+# Libretro Features
+database = "gam4980"
+supports_no_game = "false"
+libretro_saves = "true"
+cheats = "false"
+needs_fullpath = "false"
+disk_control = "false"
+is_experimental = "true"
+
+description = "BBK A4980 game emulator for libretro."
