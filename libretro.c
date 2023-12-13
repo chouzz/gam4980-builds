@@ -2064,7 +2064,8 @@ size_t retro_get_memory_size(unsigned id)
 {
     switch (id) {
     case RETRO_MEMORY_SAVE_RAM:
-        return 0x10000;
+        // Saved: $000000-$00bfff, $1f8000-$1fffff
+        return 0x14000;
     default:
         return 0;
     }
