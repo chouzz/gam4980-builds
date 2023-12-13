@@ -1975,12 +1975,21 @@ void retro_run(void)
 
     input_poll_cb();
 
-    // Only accept new joypad press when the last one is released.
+    // Handle joypad.
     static int pressed = -1;
+    static int repeat = 0;
     for (int i = 0; i < 16; i += 1) {
         if (pressed == i) {
-            if (input_state_cb(0, RETRO_DEVICE_JOYPAD, 0, i) == 0)
+            if (input_state_cb(0, RETRO_DEVICE_JOYPAD, 0, i) == 0) {
                 pressed = -1;
+                repeat = 0;
+            } else {
+                repeat += 1;
+                if (repeat > 20) {
+                    repeat -= 5;
+                    sys_keydown(_joyk[i]);
+                }
+            }
         }
         if (pressed == -1 && input_state_cb(0, RETRO_DEVICE_JOYPAD, 0, i)) {
             pressed = i;
