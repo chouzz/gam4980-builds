@@ -108,11 +108,14 @@ static uint8_t flash_read(uint32_t addr)
         0x00, 0x00, 0x00, 0x00, 0x02, 0xff, 0x01, 0x10,
         0x00, 0x1f, 0x00, 0x00, 0x01,
     };
-    if (sys.flash_cmd == 0 || sys.flash_cmd == 1)
+    if (sys.flash_cmd == 0 || sys.flash_cmd == 1) {
+        // Rotate last 32KiB to the front for save.
+        addr = (addr + 0x8000) % 0x200000;
         return sys.flash[addr];
-    else
+    } else {
         // Software ID or CFI
         return flash_info[addr];
+    }
 }
 
 static void flash_write(uint32_t addr, uint8_t val)
@@ -164,6 +167,8 @@ static void flash_write(uint32_t addr, uint8_t val)
         if (sys.flash_cmd == 1) {
             sys.flash_cmd = 0;
             sys.flash_cycles = 0;
+            // Rotate last 32KiB to the front for save.
+            addr = (addr + 0x8000) % 0x200000;
             sys.flash[addr] = val;
         } else if ((addr == 0x5555) && (val == 0xaa)) {
             sys.flash_cycles += 1;
@@ -557,25 +562,26 @@ static void sys_load(const uint8_t *gam, size_t size)
     };
 
     // Setup file headers.
+    uint8_t *flash = sys.flash + 0x8000;
     memcpy(gam_hdr + 2, gam + 6, 0x0a);
-    memcpy(sys.flash, sys_hdr, 16);
-    memcpy(sys.flash+16, gam_hdr, 16);
+    memcpy(flash, sys_hdr, 16);
+    memcpy(flash+16, gam_hdr, 16);
     // Load game into 0x20d000.
-    memcpy(sys.flash+0xd000, gam, size);
-    memset(sys.flash+0x1000, 0x01, 0x100);
+    memcpy(flash+0xd000, gam, size);
+    memset(flash+0x1000, 0x01, 0x100);
     for (int i = 0; i < 0x0c; i += 1) {
-        sys.flash[0x1000 + i] = 0x04;
+        flash[0x1000 + i] = 0x04;
     }
-    memset(sys.flash+0x7000, 0x01, 0x100);
+    memset(flash+0x7000, 0x01, 0x100);
     // Last 32 KiB for save file.
-    sys.flash[0x70f8] = 0x02;
-    sys.flash[0x70f9] = 0x02;
-    sys.flash[0x70fa] = 0x02;
-    sys.flash[0x70fb] = 0x02;
-    sys.flash[0x70fc] = 0x02;
-    sys.flash[0x70fd] = 0x02;
-    sys.flash[0x70fe] = 0x03;
-    sys.flash[0x70ff] = 0x02;
+    flash[0x70f8] = 0x02;
+    flash[0x70f9] = 0x02;
+    flash[0x70fa] = 0x02;
+    flash[0x70fb] = 0x02;
+    flash[0x70fc] = 0x02;
+    flash[0x70fd] = 0x02;
+    flash[0x70fe] = 0x03;
+    flash[0x70ff] = 0x02;
     // Setup banks for the game.
     sys.bk_tab[0x5] = 0x20d;
     sys.bk_tab[0x6] = sys.bk_tab[0x05] + 1;
@@ -2032,7 +2038,7 @@ void *retro_get_memory_data(unsigned id)
 {
     switch (id) {
     case RETRO_MEMORY_SAVE_RAM:
-        return sys.flash + 0x1f8000;
+        return sys.flash;
     default:
         return NULL;
     }
@@ -2042,7 +2048,7 @@ size_t retro_get_memory_size(unsigned id)
 {
     switch (id) {
     case RETRO_MEMORY_SAVE_RAM:
-        return 0x8000;
+        return 0x10000;
     default:
         return 0;
     }
