@@ -72,6 +72,12 @@ static struct {
     uint16_t     bk_tab[16];
     uint16_t     bk_sys_d;
 } sys;
+static struct {
+    uint8_t cpu_rate;
+    uint8_t timer_rate;
+    uint16_t lcd_bg;
+    uint16_t lcd_fg;
+} vars = { 1, 1, 0xd6da, 0x0000 };
 
 static void fallback_log(enum retro_log_level level, const char *fmt, ...);
 static retro_log_printf_t       log_cb = fallback_log;
@@ -81,7 +87,6 @@ static retro_input_poll_t       input_poll_cb;
 static retro_input_state_t      input_state_cb;
 static retro_audio_sample_t     audio_cb;
 static uint16_t                 fb[(LCD_WIDTH + 1) * LCD_HEIGHT];
-
 
 static void sys_isr();
 static void mem_bs(uint8_t sel);
@@ -1747,7 +1752,12 @@ _ff:
 
 static void sys_step()
 {
-  vrEmu6502Exec(sys.cpu, 0x12000);
+    uint32_t cycles = 0;
+    while ((sys.ram[_SYSCON] & 0x80) == 0 && (cycles < 0x12000 * vars.cpu_rate)) {
+        cycles += vrEmu6502Exec(sys.cpu, 4000 * vars.cpu_rate / vars.timer_rate);
+        sys_timer(10);
+        sys_isr();
+    }
 }
 
 static void fallback_log(enum retro_log_level level, const char *fmt, ...)
@@ -1772,12 +1782,32 @@ static void frame_cb(retro_usec_t usec)
         ms -= 1000;
         sys_rtc();
     }
-    sys_timer(usec / 100);
-    sys_isr();
 }
 
 void retro_set_environment(retro_environment_t cb)
 {
+    static struct retro_core_option_definition opts[] = {
+        {
+            .key = "gam4980_lcd_color",
+            .desc = "LCD color theme",
+            .values = {{"grey"}, {"green"}, {"blue"}, {"yellow"}, {NULL}},
+            .default_value = "grey",
+        },
+        {
+            .key = "gam4980_cpu_rate",
+            .desc = "CPU clock rate",
+            .values = {{"1"}, {"2"}, {"3"}, {"4"}, {"5"}, {"6"}, {"7"}, {"8"}, {NULL}},
+            .default_value = "1",
+        },
+        {
+            .key = "gam4980_timer_rate",
+            .desc = "Timer clock rate",
+            .values = {{"1"}, {"2"}, {"3"}, {"4"}, {"5"}, {"6"}, {"7"}, {"8"}, {NULL}},
+            .default_value = "1",
+        },
+        { NULL, NULL, NULL, {{0}}, NULL },
+    };
+
     static struct retro_log_callback log;
     static struct retro_keyboard_callback kbd = {
         .callback = keyboard_cb,
@@ -1786,11 +1816,19 @@ void retro_set_environment(retro_environment_t cb)
         .callback = frame_cb,
         .reference = 1000000 / 60,
     };
+    static bool yes = true;
     environ_cb = cb;
     if (environ_cb(RETRO_ENVIRONMENT_GET_LOG_INTERFACE, &log))
         log_cb = log.log;
     environ_cb(RETRO_ENVIRONMENT_SET_FRAME_TIME_CALLBACK, &frame);
     environ_cb(RETRO_ENVIRONMENT_SET_KEYBOARD_CALLBACK, &kbd);
+    environ_cb(RETRO_ENVIRONMENT_SET_SUPPORT_NO_GAME, &yes);
+
+    unsigned opts_ver = 0;
+    environ_cb(RETRO_ENVIRONMENT_GET_CORE_OPTIONS_VERSION, &opts_ver);
+    if (opts_ver >= 1) {
+        environ_cb(RETRO_ENVIRONMENT_SET_CORE_OPTIONS, &opts);
+    }
 }
 
 void retro_set_video_refresh(retro_video_refresh_t cb)
@@ -1840,6 +1878,35 @@ void retro_get_system_av_info(struct retro_system_av_info *info)
     environ_cb(RETRO_ENVIRONMENT_SET_PIXEL_FORMAT, &pixfmt);
 }
 
+static void apply_variables()
+{
+    struct retro_variable var = {0};
+
+    var.key = "gam4980_lcd_color";
+    if (environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE, &var)) {
+        if (strcmp(var.value, "grey") == 0) {
+            vars.lcd_bg = 0xd6da;
+            vars.lcd_fg = 0x0000;
+        } else if (strcmp(var.value, "green") == 0) {
+            vars.lcd_bg = 0x96e1;
+            vars.lcd_fg = 0x0882;
+        } else if (strcmp(var.value, "blue") == 0) {
+            vars.lcd_bg = 0x3edd;
+            vars.lcd_fg = 0x09a8;
+        } else if (strcmp(var.value, "yellow") == 0) {
+            vars.lcd_bg = 0xf72c;
+            vars.lcd_fg = 0x2920;
+        }
+    }
+    var.key = "gam4980_cpu_rate";
+    if (environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE, &var))
+        vars.cpu_rate = atoi(var.value);
+
+    var.key = "gam4980_timer_rate";
+    if (environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE, &var))
+        vars.timer_rate = atoi(var.value);
+}
+
 void retro_init(void)
 {
     char *systemdir;
@@ -1847,6 +1914,7 @@ void retro_init(void)
     environ_cb(RETRO_ENVIRONMENT_GET_SYSTEM_DIRECTORY, &systemdir);
     snprintf(romdir, 512, "%s/gam4980", systemdir);
     sys_init(romdir);
+    apply_variables();
 }
 
 bool retro_load_game(const struct retro_game_info *game)
@@ -1881,12 +1949,17 @@ static inline void pp8(int y, int x, uint8_t p8)
     // Draw 8 pixels.
     for (int i = 0; i < 8; i += 1) {
         bool p = p8 & (1 << (7 - i));
-        fb[y * LCD_WIDTH + x * 8 + i] = p ? 0x0000 : 0xffff;
+        fb[y * LCD_WIDTH + x * 8 + i] = p ? vars.lcd_fg : vars.lcd_bg;
     }
 }
 
+
 void retro_run(void)
 {
+    bool vupdated = false;
+    if (environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE_UPDATE, &vupdated) && vupdated)
+        apply_variables();
+
     input_poll_cb();
 
     // Only accept new joypad press when the last one is released.

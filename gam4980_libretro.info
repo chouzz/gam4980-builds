@@ -14,7 +14,7 @@ systemid = "gam4980"
 
 # Libretro Features
 database = "gam4980"
-supports_no_game = "false"
+supports_no_game = "true"
 libretro_saves = "true"
 cheats = "false"
 needs_fullpath = "false"
