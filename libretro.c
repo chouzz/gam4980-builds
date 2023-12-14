@@ -100,7 +100,7 @@ static inline uint32_t PA(uint16_t addr)
 static uint8_t flash_read(uint32_t addr)
 {
     static uint8_t flash_info[0x35] = {
-        0xbf, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+        0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
         0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
         0x51, 0x52, 0x59, 0x01, 0x07, 0x00, 0x00, 0x00,
         0x00, 0x00, 0x00, 0x27, 0x36, 0x00, 0x00, 0x04,
@@ -495,6 +495,7 @@ static uint8_t _kbdk[RETROK_LAST] = {
     [RETROK_RIGHT] = KEY_RIGHT,
     [RETROK_PAGEUP] = KEY_PGUP,
     [RETROK_PAGEDOWN] = KEY_PGDN,
+    [RETROK_DELETE] = KEY_DEL,
 };
 
 static void sys_keydown(uint8_t key)
@@ -704,6 +705,23 @@ static void sys_isr()
     vrEmu6502SetPC(sys.cpu, 0x0300 + idx * 4);
 }
 
+static void sys_jsr_hook(uint16_t func)
+{
+    // __banked_function_call
+    if (func == 0xd2f6 && sys.bk_tab[0xd] == sys.bk_sys_d) {
+        func = mem_read16(__addr_reg);
+        switch (func) {
+        case 0xe9c8:            /* FileCreat */
+            // XXX: Clear unused file indexes to make room for saving.
+            for (int i = 0xaf80; i < 0xb000; i += 1) {
+                if (sys.flash[0x8000 + i] == 0x00)
+                    sys.flash[0x8000 + i] = 0xff;
+            }
+            break;
+        }
+    }
+}
+
 static uint32_t vrEmu6502Exec(VrEmu6502 *cpu, uint32_t cycles)
 {
 #define NEXT goto *_table[cpu->readFn(cpu->pc++, false)]
@@ -866,6 +884,7 @@ _1f:
     count += 2;
     NEXT;
 _20:
+    sys_jsr_hook(mem_read16(cpu->pc));
     jsr(cpu, ab);
     count += 6;
     NEXT;
@@ -2064,8 +2083,8 @@ size_t retro_get_memory_size(unsigned id)
 {
     switch (id) {
     case RETRO_MEMORY_SAVE_RAM:
-        // Saved: $000000-$00bfff, $1f8000-$1fffff
-        return 0x14000;
+        // Saved: $000000-$00afff, $1f8000-$1fffff
+        return 0x13000;
     default:
         return 0;
     }
