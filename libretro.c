@@ -515,7 +515,6 @@ static void sys_keydown(uint8_t key)
     sys.ram[_SYSCON] &= 0xf7;
     sys.ram[_KEYCODE] = key | 0x80;
     sys.ram[_ISR] |= 0x80;
-    sys_isr();
 }
 
 static void keyboard_cb(bool down, unsigned keycode,
@@ -1840,8 +1839,12 @@ _ff:
 static void sys_step()
 {
     uint32_t cycles = 0;
+    uint32_t xs = 4000 * vars.cpu_rate / vars.timer_rate;
     while (cycles < 0x12000 * vars.cpu_rate) {
-        cycles += vrEmu6502Exec(sys.cpu, 4000 * vars.cpu_rate / vars.timer_rate);
+        if (sys.ram[_SYSCON] & 0x08)
+            cycles += xs;
+        else
+            cycles += vrEmu6502Exec(sys.cpu, xs);
         sys_timer(10);
         sys_isr();
     }
