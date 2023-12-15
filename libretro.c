@@ -195,6 +195,15 @@ static void flash_write(uint32_t addr, uint8_t val)
         sys.flash_cycles = 0;
         break;
     }
+
+    // Read CFI/ID info via 'sys.mem_ir'.
+    if (sys.flash_cmd == 2 || sys.flash_cmd == 3) {
+        for (int i = 0; i < 0x100; i += 1) {
+            if (sys.mem_r[i] >= sys.flash && sys.mem_r[i] < sys.flash + 0x200000) {
+                sys.mem_r[i] = 0;
+            }
+        }
+    }
 }
 
 static uint8_t invalid_read(uint16_t addr)
@@ -383,7 +392,8 @@ static void mem_bs(uint8_t sel)
         }
     } else if (paddr >= 0x200000 && paddr < 0x400000) {
         for (int i = 0; i < 16; i += 1) {
-            sys.mem_r[sel * 16 + i] = 0;
+            uint32_t faddr = (paddr - 0x200000 + 0x8000) % 0x200000;
+            sys.mem_r[sel * 16 + i] = sys.flash + faddr + i * 0x100;
             sys.mem_ir[sel * 16 + i] = flash_vread;
             sys.mem_iw[sel * 16 + i] = flash_vwrite;
         }
@@ -747,7 +757,7 @@ static void sys_hook()
 
 static uint32_t vrEmu6502Exec(VrEmu6502 *cpu, uint32_t cycles)
 {
-#define NEXT sys_hook(); goto *_table[cpu->readFn(cpu->pc++, false)]
+#define NEXT sys_hook(); goto *_table[mem_read(cpu->pc++, false)]
 #define EXIT goto _exit
     static void *_table[0x100] = {
         &&_00, &&_01, &&_02, &&_03, &&_04, &&_05, &&_06, &&_07, &&_08, &&_09, &&_0a, &&_0b, &&_0c, &&_0d, &&_0e, &&_0f,
