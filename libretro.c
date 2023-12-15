@@ -741,8 +741,9 @@ static void sys_isr()
 
 static void sys_hook()
 {
+    uint8_t op;
  _again:
-    uint8_t op = mem_read(sys.cpu->pc, false);
+    op = mem_read(sys.cpu->pc, false);
     if (op == 0x20) {
         uint16_t func = mem_read16(sys.cpu->pc + 1);
         // __banked_function_call
