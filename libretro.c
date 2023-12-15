@@ -590,16 +590,32 @@ static void sys_load(const uint8_t *gam, size_t size)
     for (int i = 0; i < 0x0c; i += 1) {
         flash[0x1000 + i] = 0x04;
     }
-    memset(flash+0x7000, 0x01, 0x100);
-    // Last 32 KiB for save file.
-    flash[0x70f8] = 0x02;
-    flash[0x70f9] = 0x02;
-    flash[0x70fa] = 0x02;
-    flash[0x70fb] = 0x02;
-    flash[0x70fc] = 0x02;
-    flash[0x70fd] = 0x02;
-    flash[0x70fe] = 0x03;
-    flash[0x70ff] = 0x02;
+
+    if (sys.bk_sys_d == 0x0ea8) { /* A4980 */
+        memset(flash+0x7000, 0x01, 0x100);
+        // Last 32 KiB for save file.
+        flash[0x70f8] = 0x02;
+        flash[0x70f9] = 0x02;
+        flash[0x70fa] = 0x02;
+        flash[0x70fb] = 0x02;
+        flash[0x70fc] = 0x02;
+        flash[0x70fd] = 0x02;
+        flash[0x70fe] = 0x03;
+        flash[0x70ff] = 0x02;
+    } else if (sys.bk_sys_d == 0x0e88) { /* A4988 */
+        memset(flash+0x8000, 0x01, 0x100);
+        // Last 32 KiB for save file.
+        flash[0x80f8] = 0x02;
+        flash[0x80f9] = 0x02;
+        flash[0x80fa] = 0x02;
+        flash[0x80fb] = 0x02;
+        flash[0x80fc] = 0x02;
+        flash[0x80fd] = 0x02;
+        flash[0x80fe] = 0x03;
+        flash[0x80ff] = 0x02;
+    } else {
+        return;
+    }
     // Setup banks for the game.
     sys.bk_tab[0x5] = 0x20d;
     sys.bk_tab[0x6] = sys.bk_tab[0x05] + 1;
@@ -736,9 +752,16 @@ static void sys_hook()
             switch (func) {
             case 0xe9c8:            /* FileCreat */
                 // XXX: Clear unused file indexes to make room for saving.
-                for (int i = 0xaf80; i < 0xb000; i += 1) {
-                    if (sys.flash[0x8000 + i] == 0x00)
-                        sys.flash[0x8000 + i] = 0xff;
+                if (sys.bk_sys_d == 0x0ea8) { /* A4980 */
+                    for (int i = 0xaf80; i < 0xb000; i += 1) {
+                        if (sys.flash[0x8000 + i] == 0x00)
+                            sys.flash[0x8000 + i] = 0xff;
+                    }
+                } else if (sys.bk_sys_d == 0x0e88) { /* A4988 */
+                    for (int i = 0xbf80; i < 0xe000; i += 1) {
+                        if (sys.flash[0x8000 + i] == 0x00)
+                            sys.flash[0x8000 + i] = 0xff;
+                    }
                 }
                 break;
             case 0x0e7c1:       /* SysGetKey */
@@ -1817,12 +1840,8 @@ _ff:
 static void sys_step()
 {
     uint32_t cycles = 0;
-    uint32_t xs = 4000 * vars.cpu_rate / vars.timer_rate;
     while (cycles < 0x12000 * vars.cpu_rate) {
-        if (sys.ram[_SYSCON] & 0x08)
-            cycles += xs;
-        else
-            cycles += vrEmu6502Exec(sys.cpu, xs);
+        cycles += vrEmu6502Exec(sys.cpu, 4000 * vars.cpu_rate / vars.timer_rate);
         sys_timer(10);
         sys_isr();
     }
@@ -2119,8 +2138,8 @@ size_t retro_get_memory_size(unsigned id)
 {
     switch (id) {
     case RETRO_MEMORY_SAVE_RAM:
-        // Saved: $000000-$00afff, $1f8000-$1fffff
-        return 0x13000;
+        // Saved: $000000-$00bfff, $1f8000-$1fffff
+        return 0x14000;
     default:
         return 0;
     }
