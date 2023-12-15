@@ -1,10 +1,9 @@
 # Software Information
 display_name = "GAM4980"
 display_version = "0.1"
-authors = ""
+authors = "Anonymous"
 categories = "Emulator"
 license = "GPLv3+"
-permissions = ""
 supported_extensions = "gam"
 
 # Hardware Information
