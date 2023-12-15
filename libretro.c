@@ -676,6 +676,8 @@ static void sys_isr()
         return;
     if ((sys.ram[_ISR] & 0x80) && (sys.ram[_IER] & 0x80)) {
         idx = 0x02; // PI
+        sys.ram[_ISR] &= 0x7f;
+        return;
     } else if ((sys.ram[_ISR] & 0x01) && (sys.ram[_IER] & 0x01)) {
         idx = 0x13; // ALM
     } else if ((sys.ram[_ISR] & 0x02) && (sys.ram[_IER] & 0x02)) {
@@ -688,6 +690,13 @@ static void sys_isr()
         idx = 0x0f; // GTL
     }  else if ((sys.ram[_TISR] & 0x01) && (sys.ram[_TIER] & 0x01)) {
         idx = 0x03; // ST1
+        sys.ram[_TISR] &= 0xfe;
+        sys.ram[0x2018] += 1;
+        if (sys.ram[0x2018] >= sys.ram[0x2019]) {
+            sys.ram[0x201e] |= 0x01;
+            sys.ram[0x2018] = 0;
+        }
+        return;
     } else if ((sys.ram[_TISR] & 0x02) && (sys.ram[_TIER] & 0x02)) {
         idx = 0x04; // ST2
     } else if ((sys.ram[_TISR] & 0x04) && (sys.ram[_TIER] & 0x04)) {
@@ -705,26 +714,40 @@ static void sys_isr()
     vrEmu6502SetPC(sys.cpu, 0x0300 + idx * 4);
 }
 
-static void sys_jsr_hook(uint16_t func)
+static void sys_hook()
 {
-    // __banked_function_call
-    if (func == 0xd2f6 && sys.bk_tab[0xd] == sys.bk_sys_d) {
-        func = mem_read16(__addr_reg);
-        switch (func) {
-        case 0xe9c8:            /* FileCreat */
-            // XXX: Clear unused file indexes to make room for saving.
-            for (int i = 0xaf80; i < 0xb000; i += 1) {
-                if (sys.flash[0x8000 + i] == 0x00)
-                    sys.flash[0x8000 + i] = 0xff;
+ _again:
+    uint8_t op = mem_read(sys.cpu->pc, false);
+    if (op == 0x20) {
+        uint16_t func = mem_read16(sys.cpu->pc + 1);
+        // __banked_function_call
+        if (func == 0xd2f6 && sys.bk_tab[0xd] == sys.bk_sys_d) {
+            func = mem_read16(__addr_reg);
+            switch (func) {
+            case 0xe9c8:            /* FileCreat */
+                // XXX: Clear unused file indexes to make room for saving.
+                for (int i = 0xaf80; i < 0xb000; i += 1) {
+                    if (sys.flash[0x8000 + i] == 0x00)
+                        sys.flash[0x8000 + i] = 0xff;
+                }
+                break;
+            case 0x0e7c1:       /* SysGetKey */
+                if (sys.ram[_KEYCODE] & 0x80) {
+                    sys.cpu->ac = sys.ram[_KEYCODE] & 0x3f;
+                    sys.ram[_KEYCODE] = 0;
+                } else {
+                    sys.cpu->ac = 0xff;
+                }
+                sys.cpu->pc += 3;
+                goto _again;
             }
-            break;
         }
     }
 }
 
 static uint32_t vrEmu6502Exec(VrEmu6502 *cpu, uint32_t cycles)
 {
-#define NEXT goto *_table[cpu->readFn(cpu->pc++, false)]
+#define NEXT sys_hook(); goto *_table[cpu->readFn(cpu->pc++, false)]
 #define EXIT goto _exit
     static void *_table[0x100] = {
         &&_00, &&_01, &&_02, &&_03, &&_04, &&_05, &&_06, &&_07, &&_08, &&_09, &&_0a, &&_0b, &&_0c, &&_0d, &&_0e, &&_0f,
@@ -884,7 +907,6 @@ _1f:
     count += 2;
     NEXT;
 _20:
-    sys_jsr_hook(mem_read16(cpu->pc));
     jsr(cpu, ab);
     count += 6;
     NEXT;
@@ -1785,8 +1807,12 @@ _ff:
 static void sys_step()
 {
     uint32_t cycles = 0;
-    while ((sys.ram[_SYSCON] & 0x80) == 0 && (cycles < 0x12000 * vars.cpu_rate)) {
-        cycles += vrEmu6502Exec(sys.cpu, 4000 * vars.cpu_rate / vars.timer_rate);
+    uint32_t xs = 4000 * vars.cpu_rate / vars.timer_rate;
+    while (cycles < 0x12000 * vars.cpu_rate) {
+        if (sys.ram[_SYSCON] & 0x08)
+            cycles += xs;
+        else
+            cycles += vrEmu6502Exec(sys.cpu, xs);
         sys_timer(10);
         sys_isr();
     }
