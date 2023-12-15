@@ -1842,10 +1842,7 @@ static void sys_step()
     uint32_t cycles = 0;
     uint32_t xs = 4000 * vars.cpu_rate / vars.timer_rate;
     while (cycles < 0x12000 * vars.cpu_rate) {
-        if (sys.ram[_SYSCON] & 0x08)
-            cycles += xs;
-        else
-            cycles += vrEmu6502Exec(sys.cpu, xs);
+        cycles += vrEmu6502Exec(sys.cpu, xs);
         sys_timer(10);
         sys_isr();
     }
