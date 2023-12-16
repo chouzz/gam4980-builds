@@ -145,6 +145,9 @@ static void flash_write(uint32_t addr, uint8_t val)
             sys.flash_cmd = 1;
             sys.flash_cycles += 1;
             break;
+        case 0x80:
+            sys.flash_cycles += 1;
+            break;
         case 0x90:
             // Software ID Entry
             sys.flash_cmd = 2;
@@ -184,11 +187,15 @@ static void flash_write(uint32_t addr, uint8_t val)
             break;
         case 0x30:
             // Sector-Erase
+            addr = (addr + 0x8000) % 0x200000;
             memset(sys.flash + (addr & 0x1ff000), 0xff, 0x1000);
             break;
         case 0x50:
             // Block-Erase
-            memset(sys.flash + (addr & 0x1f0000), 0xff, 0x10000);
+            addr = ((addr & 0x1f0000) + 0x8000) % 0x200000;
+            memset(sys.flash + addr, 0xff, 0x8000);
+            addr = (addr + 0x8000) % 0x200000;
+            memset(sys.flash + addr, 0xff, 0x8000);
             break;
         }
         sys.flash_cmd = 0;
