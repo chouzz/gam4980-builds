@@ -1847,10 +1847,18 @@ _ff:
 static void sys_step()
 {
     uint32_t cycles = 0;
-    uint32_t xs = 4000 * vars.cpu_rate / vars.timer_rate;
     while (cycles < 0x12000 * vars.cpu_rate) {
-        cycles += vrEmu6502Exec(sys.cpu, xs);
-        sys_timer(10);
+        if (sys.ram[_SYSCON] & 0x08) {
+            cycles += 400 * vars.cpu_rate;
+        } else {
+            for (int i = 0; i < vars.cpu_rate; i += 1) {
+                // XXX: 400 cycles seems to be a safe value for SysHalt handling..
+                cycles += vrEmu6502Exec(sys.cpu, 400);
+                if (sys.ram[_SYSCON] & 0x08)
+                    break;
+            }
+        }
+        sys_timer(vars.timer_rate);
         sys_isr();
     }
 }
