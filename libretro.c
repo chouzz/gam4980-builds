@@ -524,8 +524,8 @@ static uint8_t _joyk[16] = {
     [RETRO_DEVICE_ID_JOYPAD_R]      = KEY_PGDN,
     [RETRO_DEVICE_ID_JOYPAD_L2]     = KEY_MODIFY,
     [RETRO_DEVICE_ID_JOYPAD_R2]     = KEY_DEL,
-    [RETRO_DEVICE_ID_JOYPAD_L3]     = KEY_PGUP,
-    [RETRO_DEVICE_ID_JOYPAD_R3]     = KEY_PGDN,
+    [RETRO_DEVICE_ID_JOYPAD_L3]     = KEY_A,
+    [RETRO_DEVICE_ID_JOYPAD_R3]     = KEY_Z,
 };
 
 static uint8_t _kbdk[RETROK_LAST] = {
@@ -1987,6 +1987,25 @@ void retro_set_environment(retro_environment_t cb)
         },
         { NULL, NULL, NULL, {{0}}, NULL },
     };
+    static struct retro_input_descriptor inputs[] = {
+        { 0, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_B, "EXIT" },
+        { 0, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_Y, "HELP" },
+        { 0, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_SELECT, "INSERT" },
+        { 0, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_START, "SEARCH" },
+        { 0, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_UP, "UP" },
+        { 0, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_DOWN, "DOWN" },
+        { 0, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_LEFT, "LEFT" },
+        { 0, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_RIGHT, "RIGHT" },
+        { 0, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_A, "ENTER" },
+        { 0, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_X, "R" },
+        { 0, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_L, "PGUP" },
+        { 0, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_R, "PGDN" },
+        { 0, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_L2, "MODIFY" },
+        { 0, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_R2, "DEL" },
+        { 0, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_L3, "A" },
+        { 0, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_R3, "Z" },
+        { 0, 0, 0, 0, NULL },
+    };
 
     static struct retro_log_callback log;
     static struct retro_keyboard_callback kbd = {
@@ -2009,6 +2028,7 @@ void retro_set_environment(retro_environment_t cb)
     if (opts_ver >= 1) {
         environ_cb(RETRO_ENVIRONMENT_SET_CORE_OPTIONS, &opts);
     }
+    environ_cb(RETRO_ENVIRONMENT_SET_INPUT_DESCRIPTORS, &inputs);
 }
 
 void retro_set_video_refresh(retro_video_refresh_t cb)
