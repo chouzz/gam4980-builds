@@ -552,7 +552,7 @@ static void sys_init(const char *romdir)
     sys.ram[_INCR] = 0x0f;
 
     mem_init();
-    sys.cpu = vrEmu6502New(CPU_6502, mem_read, mem_write);
+    sys.cpu = vrEmu6502New(CPU_W65C02, mem_read, mem_write);
     vrEmu6502SetPC(sys.cpu, 0x0350);
 
     // Run initialize instructions until 'main'.
@@ -827,16 +827,16 @@ _01:
     count += 6;
     NEXT;
 _02:
-    err(cpu, imp);
+    ldd(cpu, imm);
     count += 2;
     NEXT;
 _03:
-    err(cpu, imp);
-    count += 2;
+    nop(cpu, imp);
+    count += 1;
     NEXT;
 _04:
-    err(cpu, imp);
-    count += 2;
+    tsb(cpu, zp);
+    count += 5;
     NEXT;
 _05:
     ora(cpu, zp);
@@ -847,8 +847,8 @@ _06:
     count += 5;
     NEXT;
 _07:
-    err(cpu, imp);
-    count += 2;
+    rmb0(cpu, zp);
+    count += 5;
     NEXT;
 _08:
     php(cpu, imp);
@@ -863,12 +863,12 @@ _0a:
     count += 2;
     NEXT;
 _0b:
-    err(cpu, imp);
-    count += 2;
+    nop(cpu, imp);
+    count += 1;
     NEXT;
 _0c:
-    err(cpu, imp);
-    count += 2;
+    tsb(cpu, ab);
+    count += 6;
     NEXT;
 _0d:
     ora(cpu, ab);
@@ -879,8 +879,8 @@ _0e:
     count += 6;
     NEXT;
 _0f:
-    err(cpu, imp);
-    count += 2;
+    bbr0(cpu, zp);
+    count += 5;
     NEXT;
 _10:
     bpl(cpu, rel);
@@ -891,16 +891,16 @@ _11:
     count += 5;
     NEXT;
 _12:
-    err(cpu, imp);
-    count += 2;
+    ora(cpu, zpi);
+    count += 5;
     NEXT;
 _13:
-    err(cpu, imp);
-    count += 2;
+    nop(cpu, imp);
+    count += 1;
     NEXT;
 _14:
-    err(cpu, imp);
-    count += 2;
+    trb(cpu, zp);
+    count += 5;
     NEXT;
 _15:
     ora(cpu, zpx);
@@ -911,8 +911,8 @@ _16:
     count += 6;
     NEXT;
 _17:
-    err(cpu, imp);
-    count += 2;
+    rmb1(cpu, zp);
+    count += 5;
     NEXT;
 _18:
     clc(cpu, imp);
@@ -923,28 +923,28 @@ _19:
     count += 4;
     NEXT;
 _1a:
-    err(cpu, imp);
+    inc(cpu, acc);
     count += 2;
     NEXT;
 _1b:
-    err(cpu, imp);
-    count += 2;
+    nop(cpu, imp);
+    count += 1;
     NEXT;
 _1c:
-    err(cpu, imp);
-    count += 2;
+    trb(cpu, ab);
+    count += 6;
     NEXT;
 _1d:
     ora(cpu, axp);
     count += 4;
     NEXT;
 _1e:
-    asl(cpu, abx);
-    count += 7;
+    asl(cpu, axp);
+    count += 6;
     NEXT;
 _1f:
-    err(cpu, imp);
-    count += 2;
+    bbr1(cpu, zp);
+    count += 5;
     NEXT;
 _20:
     jsr(cpu, ab);
@@ -955,12 +955,12 @@ _21:
     count += 6;
     NEXT;
 _22:
-    err(cpu, imp);
+    ldd(cpu, imm);
     count += 2;
     NEXT;
 _23:
-    err(cpu, imp);
-    count += 2;
+    nop(cpu, imp);
+    count += 1;
     NEXT;
 _24:
     bit(cpu, zp);
@@ -975,8 +975,8 @@ _26:
     count += 5;
     NEXT;
 _27:
-    err(cpu, imp);
-    count += 2;
+    rmb2(cpu, zp);
+    count += 5;
     NEXT;
 _28:
     plp(cpu, imp);
@@ -991,8 +991,8 @@ _2a:
     count += 2;
     NEXT;
 _2b:
-    err(cpu, imp);
-    count += 2;
+    nop(cpu, imp);
+    count += 1;
     NEXT;
 _2c:
     bit(cpu, ab);
@@ -1007,8 +1007,8 @@ _2e:
     count += 6;
     NEXT;
 _2f:
-    err(cpu, imp);
-    count += 2;
+    bbr2(cpu, zp);
+    count += 5;
     NEXT;
 _30:
     bmi(cpu, rel);
@@ -1019,16 +1019,16 @@ _31:
     count += 5;
     NEXT;
 _32:
-    err(cpu, imp);
-    count += 2;
+    and(cpu, zpi);
+    count += 5;
     NEXT;
 _33:
-    err(cpu, imp);
-    count += 2;
+    nop(cpu, imp);
+    count += 1;
     NEXT;
 _34:
-    err(cpu, imp);
-    count += 2;
+    bit(cpu, zpx);
+    count += 4;
     NEXT;
 _35:
     and(cpu, zpx);
@@ -1039,8 +1039,8 @@ _36:
     count += 6;
     NEXT;
 _37:
-    err(cpu, imp);
-    count += 2;
+    rmb3(cpu, zp);
+    count += 5;
     NEXT;
 _38:
     sec(cpu, imp);
@@ -1051,28 +1051,28 @@ _39:
     count += 4;
     NEXT;
 _3a:
-    err(cpu, imp);
+    dec(cpu, acc);
     count += 2;
     NEXT;
 _3b:
-    err(cpu, imp);
-    count += 2;
+    nop(cpu, imp);
+    count += 1;
     NEXT;
 _3c:
-    err(cpu, imp);
-    count += 2;
+    bit(cpu, abx);
+    count += 4;
     NEXT;
 _3d:
     and(cpu, axp);
     count += 4;
     NEXT;
 _3e:
-    rol(cpu, abx);
-    count += 7;
+    rol(cpu, axp);
+    count += 6;
     NEXT;
 _3f:
-    err(cpu, imp);
-    count += 2;
+    bbr3(cpu, zp);
+    count += 5;
     NEXT;
 _40:
     rti(cpu, imp);
@@ -1083,16 +1083,16 @@ _41:
     count += 6;
     NEXT;
 _42:
-    err(cpu, imp);
+    ldd(cpu, imm);
     count += 2;
     NEXT;
 _43:
-    err(cpu, imp);
-    count += 2;
+    nop(cpu, imp);
+    count += 1;
     NEXT;
 _44:
-    err(cpu, imp);
-    count += 2;
+    ldd(cpu, zp);
+    count += 3;
     NEXT;
 _45:
     eor(cpu, zp);
@@ -1103,8 +1103,8 @@ _46:
     count += 5;
     NEXT;
 _47:
-    err(cpu, imp);
-    count += 2;
+    rmb4(cpu, zp);
+    count += 5;
     NEXT;
 _48:
     pha(cpu, imp);
@@ -1119,8 +1119,8 @@ _4a:
     count += 2;
     NEXT;
 _4b:
-    err(cpu, imp);
-    count += 2;
+    nop(cpu, imp);
+    count += 1;
     NEXT;
 _4c:
     jmp(cpu, ab);
@@ -1135,8 +1135,8 @@ _4e:
     count += 6;
     NEXT;
 _4f:
-    err(cpu, imp);
-    count += 2;
+    bbr4(cpu, zp);
+    count += 5;
     NEXT;
 _50:
     bvc(cpu, rel);
@@ -1147,16 +1147,16 @@ _51:
     count += 5;
     NEXT;
 _52:
-    err(cpu, imp);
-    count += 2;
+    eor(cpu, zpi);
+    count += 5;
     NEXT;
 _53:
-    err(cpu, imp);
-    count += 2;
+    nop(cpu, imp);
+    count += 1;
     NEXT;
 _54:
-    err(cpu, imp);
-    count += 2;
+    ldd(cpu, zpx);
+    count += 4;
     NEXT;
 _55:
     eor(cpu, zpx);
@@ -1167,8 +1167,8 @@ _56:
     count += 6;
     NEXT;
 _57:
-    err(cpu, imp);
-    count += 2;
+    rmb5(cpu, zp);
+    count += 5;
     NEXT;
 _58:
     cli(cpu, imp);
@@ -1179,28 +1179,28 @@ _59:
     count += 4;
     NEXT;
 _5a:
-    err(cpu, imp);
-    count += 2;
+    phy(cpu, imp);
+    count += 3;
     NEXT;
 _5b:
-    err(cpu, imp);
-    count += 2;
+    nop(cpu, imp);
+    count += 1;
     NEXT;
 _5c:
-    err(cpu, imp);
-    count += 2;
+    ldd(cpu, ab);
+    count += 8;
     NEXT;
 _5d:
     eor(cpu, axp);
     count += 4;
     NEXT;
 _5e:
-    lsr(cpu, abx);
-    count += 7;
+    lsr(cpu, axp);
+    count += 6;
     NEXT;
 _5f:
-    err(cpu, imp);
-    count += 2;
+    bbr5(cpu, zp);
+    count += 5;
     NEXT;
 _60:
     rts(cpu, imp);
@@ -1211,16 +1211,16 @@ _61:
     count += 6;
     NEXT;
 _62:
-    err(cpu, imp);
+    ldd(cpu, imm);
     count += 2;
     NEXT;
 _63:
-    err(cpu, imp);
-    count += 2;
+    nop(cpu, imp);
+    count += 1;
     NEXT;
 _64:
-    err(cpu, imp);
-    count += 2;
+    stz(cpu, zp);
+    count += 3;
     NEXT;
 _65:
     adc(cpu, zp);
@@ -1231,8 +1231,8 @@ _66:
     count += 5;
     NEXT;
 _67:
-    err(cpu, imp);
-    count += 2;
+    rmb6(cpu, zp);
+    count += 5;
     NEXT;
 _68:
     pla(cpu, imp);
@@ -1247,12 +1247,12 @@ _6a:
     count += 2;
     NEXT;
 _6b:
-    err(cpu, imp);
-    count += 2;
+    nop(cpu, imp);
+    count += 1;
     NEXT;
 _6c:
     jmp(cpu, ind);
-    count += 5;
+    count += 6;
     NEXT;
 _6d:
     adc(cpu, ab);
@@ -1263,8 +1263,8 @@ _6e:
     count += 6;
     NEXT;
 _6f:
-    err(cpu, imp);
-    count += 2;
+    bbr6(cpu, zp);
+    count += 5;
     NEXT;
 _70:
     bvs(cpu, rel);
@@ -1275,16 +1275,16 @@ _71:
     count += 5;
     NEXT;
 _72:
-    err(cpu, imp);
-    count += 2;
+    adc(cpu, zpi);
+    count += 5;
     NEXT;
 _73:
-    err(cpu, imp);
-    count += 2;
+    nop(cpu, imp);
+    count += 1;
     NEXT;
 _74:
-    err(cpu, imp);
-    count += 2;
+    stz(cpu, zpx);
+    count += 4;
     NEXT;
 _75:
     adc(cpu, zpx);
@@ -1295,8 +1295,8 @@ _76:
     count += 6;
     NEXT;
 _77:
-    err(cpu, imp);
-    count += 2;
+    rmb7(cpu, zp);
+    count += 5;
     NEXT;
 _78:
     sei(cpu, imp);
@@ -1307,31 +1307,31 @@ _79:
     count += 4;
     NEXT;
 _7a:
-    err(cpu, imp);
-    count += 2;
+    ply(cpu, imp);
+    count += 4;
     NEXT;
 _7b:
-    err(cpu, imp);
-    count += 2;
+    nop(cpu, imp);
+    count += 1;
     NEXT;
 _7c:
-    err(cpu, imp);
-    count += 2;
+    jmp(cpu, indx);
+    count += 6;
     NEXT;
 _7d:
     adc(cpu, axp);
     count += 4;
     NEXT;
 _7e:
-    ror(cpu, abx);
-    count += 7;
+    ror(cpu, axp);
+    count += 6;
     NEXT;
 _7f:
-    err(cpu, imp);
-    count += 2;
+    bbr7(cpu, zp);
+    count += 5;
     NEXT;
 _80:
-    err(cpu, imp);
+    bra(cpu, rel);
     count += 2;
     NEXT;
 _81:
@@ -1339,12 +1339,12 @@ _81:
     count += 6;
     NEXT;
 _82:
-    err(cpu, imp);
+    ldd(cpu, imm);
     count += 2;
     NEXT;
 _83:
-    err(cpu, imp);
-    count += 2;
+    nop(cpu, imp);
+    count += 1;
     NEXT;
 _84:
     sty(cpu, zp);
@@ -1359,15 +1359,15 @@ _86:
     count += 3;
     NEXT;
 _87:
-    err(cpu, imp);
-    count += 2;
+    smb0(cpu, zp);
+    count += 5;
     NEXT;
 _88:
     dey(cpu, imp);
     count += 2;
     NEXT;
 _89:
-    err(cpu, imp);
+    bit(cpu, imm);
     count += 2;
     NEXT;
 _8a:
@@ -1375,8 +1375,8 @@ _8a:
     count += 2;
     NEXT;
 _8b:
-    err(cpu, imp);
-    count += 2;
+    nop(cpu, imp);
+    count += 1;
     NEXT;
 _8c:
     sty(cpu, ab);
@@ -1391,8 +1391,8 @@ _8e:
     count += 4;
     NEXT;
 _8f:
-    err(cpu, imp);
-    count += 2;
+    bbs0(cpu, zp);
+    count += 5;
     NEXT;
 _90:
     bcc(cpu, rel);
@@ -1403,12 +1403,12 @@ _91:
     count += 6;
     NEXT;
 _92:
-    err(cpu, imp);
-    count += 2;
+    sta(cpu, zpi);
+    count += 5;
     NEXT;
 _93:
-    err(cpu, imp);
-    count += 2;
+    nop(cpu, imp);
+    count += 1;
     NEXT;
 _94:
     sty(cpu, zpx);
@@ -1423,8 +1423,8 @@ _96:
     count += 4;
     NEXT;
 _97:
-    err(cpu, imp);
-    count += 2;
+    smb1(cpu, zp);
+    count += 5;
     NEXT;
 _98:
     tya(cpu, imp);
@@ -1439,24 +1439,24 @@ _9a:
     count += 2;
     NEXT;
 _9b:
-    err(cpu, imp);
-    count += 2;
+    nop(cpu, imp);
+    count += 1;
     NEXT;
 _9c:
-    err(cpu, imp);
-    count += 2;
+    stz(cpu, ab);
+    count += 4;
     NEXT;
 _9d:
     sta(cpu, abx);
     count += 5;
     NEXT;
 _9e:
-    err(cpu, imp);
-    count += 2;
+    stz(cpu, abx);
+    count += 5;
     NEXT;
 _9f:
-    err(cpu, imp);
-    count += 2;
+    bbs1(cpu, zp);
+    count += 5;
     NEXT;
 _a0:
     ldy(cpu, imm);
@@ -1471,8 +1471,8 @@ _a2:
     count += 2;
     NEXT;
 _a3:
-    err(cpu, imp);
-    count += 2;
+    nop(cpu, imp);
+    count += 1;
     NEXT;
 _a4:
     ldy(cpu, zp);
@@ -1487,8 +1487,8 @@ _a6:
     count += 3;
     NEXT;
 _a7:
-    err(cpu, imp);
-    count += 2;
+    smb2(cpu, zp);
+    count += 5;
     NEXT;
 _a8:
     tay(cpu, imp);
@@ -1503,8 +1503,8 @@ _aa:
     count += 2;
     NEXT;
 _ab:
-    err(cpu, imp);
-    count += 2;
+    nop(cpu, imp);
+    count += 1;
     NEXT;
 _ac:
     ldy(cpu, ab);
@@ -1519,8 +1519,8 @@ _ae:
     count += 4;
     NEXT;
 _af:
-    err(cpu, imp);
-    count += 2;
+    bbs2(cpu, zp);
+    count += 5;
     NEXT;
 _b0:
     bcs(cpu, rel);
@@ -1531,12 +1531,12 @@ _b1:
     count += 5;
     NEXT;
 _b2:
-    err(cpu, imp);
-    count += 2;
+    lda(cpu, zpi);
+    count += 5;
     NEXT;
 _b3:
-    err(cpu, imp);
-    count += 2;
+    nop(cpu, imp);
+    count += 1;
     NEXT;
 _b4:
     ldy(cpu, zpx);
@@ -1551,8 +1551,8 @@ _b6:
     count += 4;
     NEXT;
 _b7:
-    err(cpu, imp);
-    count += 2;
+    smb3(cpu, zp);
+    count += 5;
     NEXT;
 _b8:
     clv(cpu, imp);
@@ -1567,8 +1567,8 @@ _ba:
     count += 2;
     NEXT;
 _bb:
-    err(cpu, imp);
-    count += 2;
+    nop(cpu, imp);
+    count += 1;
     NEXT;
 _bc:
     ldy(cpu, axp);
@@ -1583,8 +1583,8 @@ _be:
     count += 4;
     NEXT;
 _bf:
-    err(cpu, imp);
-    count += 2;
+    bbs3(cpu, zp);
+    count += 5;
     NEXT;
 _c0:
     cpy(cpu, imm);
@@ -1595,12 +1595,12 @@ _c1:
     count += 6;
     NEXT;
 _c2:
-    err(cpu, imp);
+    ldd(cpu, imm);
     count += 2;
     NEXT;
 _c3:
-    err(cpu, imp);
-    count += 2;
+    nop(cpu, imp);
+    count += 1;
     NEXT;
 _c4:
     cpy(cpu, zp);
@@ -1615,8 +1615,8 @@ _c6:
     count += 5;
     NEXT;
 _c7:
-    err(cpu, imp);
-    count += 2;
+    smb4(cpu, zp);
+    count += 5;
     NEXT;
 _c8:
     iny(cpu, imp);
@@ -1631,8 +1631,8 @@ _ca:
     count += 2;
     NEXT;
 _cb:
-    err(cpu, imp);
-    count += 2;
+    wai(cpu, imp);
+    count += 3;
     NEXT;
 _cc:
     cpy(cpu, ab);
@@ -1647,8 +1647,8 @@ _ce:
     count += 6;
     NEXT;
 _cf:
-    err(cpu, imp);
-    count += 2;
+    bbs4(cpu, zp);
+    count += 5;
     NEXT;
 _d0:
     bne(cpu, rel);
@@ -1659,16 +1659,16 @@ _d1:
     count += 5;
     NEXT;
 _d2:
-    err(cpu, imp);
-    count += 2;
+    cmp(cpu, zpi);
+    count += 5;
     NEXT;
 _d3:
-    err(cpu, imp);
-    count += 2;
+    nop(cpu, imp);
+    count += 1;
     NEXT;
 _d4:
-    err(cpu, imp);
-    count += 2;
+    ldd(cpu, zpx);
+    count += 4;
     NEXT;
 _d5:
     cmp(cpu, zpx);
@@ -1679,8 +1679,8 @@ _d6:
     count += 6;
     NEXT;
 _d7:
-    err(cpu, imp);
-    count += 2;
+    smb5(cpu, zp);
+    count += 5;
     NEXT;
 _d8:
     cld(cpu, imp);
@@ -1691,16 +1691,16 @@ _d9:
     count += 4;
     NEXT;
 _da:
-    err(cpu, imp);
-    count += 2;
+    phx(cpu, imp);
+    count += 3;
     NEXT;
 _db:
-    err(cpu, imp);
-    count += 2;
+    stp(cpu, imp);
+    count += 3;
     NEXT;
 _dc:
-    err(cpu, imp);
-    count += 2;
+    ldd(cpu, ab);
+    count += 4;
     NEXT;
 _dd:
     cmp(cpu, axp);
@@ -1711,8 +1711,8 @@ _de:
     count += 7;
     NEXT;
 _df:
-    err(cpu, imp);
-    count += 2;
+    bbs5(cpu, zp);
+    count += 5;
     NEXT;
 _e0:
     cpx(cpu, imm);
@@ -1723,12 +1723,12 @@ _e1:
     count += 6;
     NEXT;
 _e2:
-    err(cpu, imp);
+    ldd(cpu, imm);
     count += 2;
     NEXT;
 _e3:
-    err(cpu, imp);
-    count += 2;
+    nop(cpu, imp);
+    count += 1;
     NEXT;
 _e4:
     cpx(cpu, zp);
@@ -1743,8 +1743,8 @@ _e6:
     count += 5;
     NEXT;
 _e7:
-    err(cpu, imp);
-    count += 2;
+    smb6(cpu, zp);
+    count += 5;
     NEXT;
 _e8:
     inx(cpu, imp);
@@ -1759,8 +1759,8 @@ _ea:
     count += 2;
     NEXT;
 _eb:
-    err(cpu, imp);
-    count += 2;
+    nop(cpu, imp);
+    count += 1;
     NEXT;
 _ec:
     cpx(cpu, ab);
@@ -1775,8 +1775,8 @@ _ee:
     count += 6;
     NEXT;
 _ef:
-    err(cpu, imp);
-    count += 2;
+    bbs6(cpu, zp);
+    count += 5;
     NEXT;
 _f0:
     beq(cpu, rel);
@@ -1787,16 +1787,16 @@ _f1:
     count += 5;
     NEXT;
 _f2:
-    err(cpu, imp);
-    count += 2;
+    sbc(cpu, zpi);
+    count += 5;
     NEXT;
 _f3:
-    err(cpu, imp);
-    count += 2;
+    nop(cpu, imp);
+    count += 1;
     NEXT;
 _f4:
-    err(cpu, imp);
-    count += 2;
+    ldd(cpu, zpx);
+    count += 4;
     NEXT;
 _f5:
     sbc(cpu, zpx);
@@ -1807,8 +1807,8 @@ _f6:
     count += 6;
     NEXT;
 _f7:
-    err(cpu, imp);
-    count += 2;
+    smb7(cpu, zp);
+    count += 5;
     NEXT;
 _f8:
     sed(cpu, imp);
@@ -1819,16 +1819,16 @@ _f9:
     count += 4;
     NEXT;
 _fa:
-    err(cpu, imp);
-    count += 2;
+    plx(cpu, imp);
+    count += 4;
     NEXT;
 _fb:
-    err(cpu, imp);
-    count += 2;
+    nop(cpu, imp);
+    count += 1;
     NEXT;
 _fc:
-    err(cpu, imp);
-    count += 2;
+    ldd(cpu, ab);
+    count += 4;
     NEXT;
 _fd:
     sbc(cpu, axp);
@@ -1839,8 +1839,8 @@ _fe:
     count += 7;
     NEXT;
 _ff:
-    err(cpu, imp);
-    count += 2;
+    bbs7(cpu, zp);
+    count += 5;
     NEXT;
 }
 
