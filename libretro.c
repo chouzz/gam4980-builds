@@ -445,68 +445,69 @@ static void mem_write(uint16_t addr, uint8_t val)
 }
 
 enum _key {
-    KEY_ON_OFF    = 0x00,       /* 开关 */
-    KEY_HOME_MENU = 0x01,       /* 目录 */
-    KEY_EC_SJ     = 0x02,       /* 双解 */
-    KEY_EC_SW     = 0x03,       /* 十万 */
-    KEY_CE        = 0x04,       /* 汉英 */
-    KEY_DLG       = 0x05,       /* 对话 */
-    KEY_DOWNLOAD  = 0x06,       /* 下载 */
-    KEY_SPK       = 0x07,       /* 发音 */
-    KEY_1         = 0x08,
-    KEY_2         = 0x09,
-    KEY_3         = 0x0a,
-    KEY_4         = 0x0b,
-    KEY_5         = 0x0c,
-    KEY_6         = 0x0d,
-    KEY_7         = 0x0e,
-    KEY_8         = 0x0f,
-    KEY_9         = 0x30,
-    KEY_0         = 0x31,
-    KEY_Q         = 0x10,
-    KEY_W         = 0x11,
-    KEY_E         = 0x12,
-    KEY_R         = 0x13,
-    KEY_T         = 0x14,
-    KEY_Y         = 0x15,
-    KEY_U         = 0x16,
-    KEY_I         = 0x17,
-    KEY_O         = 0x32,
-    KEY_P         = 0x33,
-    KEY_SPACE     = 0x36,       /* 空格 */
-    KEY_A         = 0x18,
-    KEY_S         = 0x19,
-    KEY_D         = 0x1a,
-    KEY_F         = 0x1b,
-    KEY_G         = 0x1c,
-    KEY_H         = 0x1d,
-    KEY_J         = 0x1e,
-    KEY_K         = 0x1f,
-    KEY_L         = 0x34,
-    KEY_INPUT     = 0x20,       /* 输入法 */
-    KEY_CAPS      = KEY_INPUT,
-    KEY_Z         = 0x21,
-    KEY_X         = 0x22,
-    KEY_C         = 0x23,
-    KEY_V         = 0x24,
-    KEY_B         = 0x25,
-    KEY_N         = 0x26,
-    KEY_M         = 0x27,
-    KEY_ZY        = 0x28,       /* 中英 */
-    KEY_SHIFT     = KEY_ZY,
-    KEY_HELP      = 0x29,       /* 帮助 */
-    KEY_SEARCH    = 0x2a,       /* 查找 */
-    KEY_INSERT    = 0x2b,       /* 插入 */
-    KEY_MODIFY    = 0x2c,       /* 修改 */
-    KEY_DEL       = 0x2d,       /* 删除 */
-    KEY_EXIT      = 0x2e,       /* 跳出 */
-    KEY_ENTER     = 0x2f,       /* 输入 */
-    KEY_UP        = 0x35,
-    KEY_DOWN      = 0x38,
-    KEY_LEFT      = 0x37,
-    KEY_RIGHT     = 0x39,
-    KEY_PGUP      = 0x3a,
-    KEY_PGDN      = 0x3b,
+    KEY_ON_OFF     = 0x00,      /* 开关 */
+    KEY_HOME_MENU  = 0x01,      /* 目录 */
+    KEY_EC_SJ      = 0x02,      /* 双解 */
+    KEY_EC_SW      = 0x03,      /* 十万 (4988: 现代) */
+    KEY_CE         = 0x04,      /* 汉英 */
+    KEY_DLG        = 0x05,      /* 对话 */
+    KEY_DOWNLOAD   = 0x06,      /* 下载 */
+    KEY_SPK        = 0x07,      /* 发音 */
+    KEY_1          = 0x08,
+    KEY_2          = 0x09,
+    KEY_3          = 0x0a,
+    KEY_4          = 0x0b,
+    KEY_5          = 0x0c,
+    KEY_6          = 0x0d,
+    KEY_7          = 0x0e,
+    KEY_8          = 0x0f,
+    KEY_9          = 0x30,
+    KEY_0          = 0x31,
+    KEY_Q          = 0x10,
+    KEY_W          = 0x11,
+    KEY_E          = 0x12,
+    KEY_R          = 0x13,
+    KEY_T          = 0x14,
+    KEY_Y          = 0x15,
+    KEY_U          = 0x16,
+    KEY_I          = 0x17,
+    KEY_O          = 0x32,
+    KEY_P          = 0x33,
+    KEY_SPACE      = 0x36,      /* 空格 */
+    KEY_A          = 0x18,
+    KEY_S          = 0x19,
+    KEY_D          = 0x1a,
+    KEY_F          = 0x1b,
+    KEY_G          = 0x1c,
+    KEY_H          = 0x1d,
+    KEY_J          = 0x1e,
+    KEY_K          = 0x1f,
+    KEY_L          = 0x34,
+    KEY_INPUT      = 0x20,      /* 输入法 */
+    KEY_CAPS       = KEY_INPUT,
+    KEY_Z          = 0x21,
+    KEY_X          = 0x22,
+    KEY_C          = 0x23,
+    KEY_V          = 0x24,
+    KEY_B          = 0x25,
+    KEY_N          = 0x26,
+    KEY_M          = 0x27,
+    KEY_ZY         = 0x28,      /* 中英 */
+    KEY_SHIFT      = KEY_ZY,
+    KEY_HELP       = 0x29,      /* 帮助 */
+    KEY_SEARCH     = 0x2a,      /* 查找 */
+    KEY_INSERT     = 0x2b,      /* 插入 */
+    KEY_MODIFY     = 0x2c,      /* 修改 */
+    KEY_DEL        = 0x2d,      /* 删除 */
+    KEY_SHIFT_4988 = 0x2d,
+    KEY_EXIT       = 0x2e,      /* 跳出 */
+    KEY_ENTER      = 0x2f,      /* 输入 */
+    KEY_UP         = 0x35,
+    KEY_DOWN       = 0x38,
+    KEY_LEFT       = 0x37,
+    KEY_RIGHT      = 0x39,
+    KEY_PGUP       = 0x3a,
+    KEY_PGDN       = 0x3b,
 };
 
 static uint8_t _joyk[16] = {
@@ -611,6 +612,25 @@ static void keyboard_cb(bool down, unsigned keycode,
 
 static void sys_init(const char *romdir)
 {
+    static struct retro_input_descriptor inputs[] = {
+        { 0, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_B, "EXIT" },
+        { 0, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_Y, "HELP" },
+        { 0, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_SELECT, "INSERT" },
+        { 0, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_START, "SEARCH" },
+        { 0, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_UP, "UP" },
+        { 0, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_DOWN, "DOWN" },
+        { 0, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_LEFT, "LEFT" },
+        { 0, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_RIGHT, "RIGHT" },
+        { 0, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_A, "ENTER" },
+        { 0, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_X, "R" },
+        { 0, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_L, "PGUP" },
+        { 0, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_R, "PGDN" },
+        { 0, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_L2, "MODIFY" },
+        { 0, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_R2, "DEL" },
+        { 0, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_L3, "A" },
+        { 0, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_R3, "Z" },
+        { 0, 0, 0, 0, NULL },
+    };
     char path[512];
     FILE *stream;
     snprintf(path, 512, "%s/8.BIN", romdir);
@@ -637,6 +657,22 @@ static void sys_init(const char *romdir)
              sys.ram[__addr_reg] == 0x37 && sys.ram[__addr_reg+1] == 0xe7))
         vrEmu6502InstCycle(sys.cpu);
     sys.bk_sys_d = sys.bk_tab[0xd];
+
+    if (sys.bk_sys_d == 0x0e88) { /* 4988 */
+        _joyk[RETRO_DEVICE_ID_JOYPAD_Y] = KEY_Z;
+        _joyk[RETRO_DEVICE_ID_JOYPAD_SELECT] = KEY_SHIFT_4988;
+        _joyk[RETRO_DEVICE_ID_JOYPAD_START] = KEY_ZY;
+        _joyk[RETRO_DEVICE_ID_JOYPAD_L2] = KEY_SPACE;
+        _joyk[RETRO_DEVICE_ID_JOYPAD_R2] = KEY_X;
+        _joyk[RETRO_DEVICE_ID_JOYPAD_R3] = KEY_S;
+        inputs[RETRO_DEVICE_ID_JOYPAD_Y].description = "Z";
+        inputs[RETRO_DEVICE_ID_JOYPAD_SELECT].description = "SHIFT";
+        inputs[RETRO_DEVICE_ID_JOYPAD_START].description = "ZY";
+        inputs[RETRO_DEVICE_ID_JOYPAD_L2].description = "SPACE";
+        inputs[RETRO_DEVICE_ID_JOYPAD_R2].description = "X";
+        inputs[RETRO_DEVICE_ID_JOYPAD_R3].description = "S";
+    }
+    environ_cb(RETRO_ENVIRONMENT_SET_INPUT_DESCRIPTORS, &inputs);
 }
 
 static void sys_deinit()
@@ -1973,25 +2009,6 @@ void retro_set_environment(retro_environment_t cb)
         },
         { NULL, NULL, NULL, {{0}}, NULL },
     };
-    static struct retro_input_descriptor inputs[] = {
-        { 0, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_B, "EXIT" },
-        { 0, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_Y, "HELP" },
-        { 0, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_SELECT, "INSERT" },
-        { 0, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_START, "SEARCH" },
-        { 0, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_UP, "UP" },
-        { 0, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_DOWN, "DOWN" },
-        { 0, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_LEFT, "LEFT" },
-        { 0, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_RIGHT, "RIGHT" },
-        { 0, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_A, "ENTER" },
-        { 0, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_X, "R" },
-        { 0, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_L, "PGUP" },
-        { 0, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_R, "PGDN" },
-        { 0, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_L2, "MODIFY" },
-        { 0, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_R2, "DEL" },
-        { 0, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_L3, "A" },
-        { 0, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_R3, "Z" },
-        { 0, 0, 0, 0, NULL },
-    };
 
     static struct retro_log_callback log;
     static struct retro_keyboard_callback kbd = {
@@ -2014,7 +2031,6 @@ void retro_set_environment(retro_environment_t cb)
     if (opts_ver >= 1) {
         environ_cb(RETRO_ENVIRONMENT_SET_CORE_OPTIONS, &opts);
     }
-    environ_cb(RETRO_ENVIRONMENT_SET_INPUT_DESCRIPTORS, &inputs);
 }
 
 void retro_set_video_refresh(retro_video_refresh_t cb)
