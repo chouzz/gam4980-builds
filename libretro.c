@@ -834,21 +834,7 @@ static void sys_hook()
         if (func == 0xd2f6 && sys.bk_tab[0xd] == sys.bk_sys_d) {
             func = mem_read16(__addr_reg);
             switch (func) {
-            case 0xe9c8:            /* FileCreat */
-                // XXX: Clear unused file indexes to make room for saving.
-                if (sys.bk_sys_d == 0x0ea8) { /* A4980 */
-                    for (int i = 0xaf80; i < 0xb000; i += 1) {
-                        if (sys.flash[0x8000 + i] == 0x00)
-                            sys.flash[0x8000 + i] = 0xff;
-                    }
-                } else if (sys.bk_sys_d == 0x0e88) { /* A4988 */
-                    for (int i = 0xbf80; i < 0xe000; i += 1) {
-                        if (sys.flash[0x8000 + i] == 0x00)
-                            sys.flash[0x8000 + i] = 0xff;
-                    }
-                }
-                break;
-            case 0x0e7c1:       /* SysGetKey */
+            case 0xe7c1:        /* SysGetKey */
                 if (sys.ram[_KEYCODE] & 0x80) {
                     sys.cpu->ac = sys.ram[_KEYCODE] & 0x3f;
                     sys.ram[_KEYCODE] = 0;
