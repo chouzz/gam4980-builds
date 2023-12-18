@@ -1224,7 +1224,7 @@ _4b:
 _4c:
     jmp(cpu, ab);
     count += 3;
-    NEXT;
+    EXIT;
 _4d:
     eor(cpu, ab);
     count += 4;
