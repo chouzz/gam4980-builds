@@ -893,7 +893,7 @@ static uint32_t vrEmu6502Exec(VrEmu6502 *cpu, uint32_t cycles)
     };
     uint32_t count = 0;
 _exit:
-    if (count >= cycles)
+    if (count >= cycles || (sys.ram[_SYSCON] & 0x08))
         return count;
     else
         NEXT;
@@ -1933,11 +1933,11 @@ static void sys_step()
     uint32_t cycles = 0;
     while (cycles < 0x12000 * vars.cpu_rate) {
         if (sys.ram[_SYSCON] & 0x08) {
-            cycles += 256 * vars.cpu_rate;
+            cycles += 400 * vars.cpu_rate;
         } else {
             for (int i = 0; i < vars.cpu_rate; i += 1) {
-                // XXX: 256 cycles step seems to be a safe value for SysHalt handling..
-                cycles += vrEmu6502Exec(sys.cpu, 256);
+                // XXX: 400 cycles step seems to be a safe value for SysHalt handling..
+                cycles += vrEmu6502Exec(sys.cpu, 400);
                 if (sys.ram[_SYSCON] & 0x08)
                     break;
             }
