@@ -53,6 +53,9 @@
 #define _AUDCON         0x23f
 #define _KEYCODE        0x24e
 #define _MACCTL         0x260
+#define _KeyBuffTop     0x2003
+#define _KeyBuffBottom  0x2004
+#define _KeyBuffer      0x2008
 
 #define LCD_WIDTH 159
 #define LCD_HEIGHT 96
@@ -600,6 +603,12 @@ static void sys_keydown(uint8_t key)
     sys.ram[_SYSCON] &= 0xf7;
     sys.ram[_KEYCODE] = key | 0x80;
     sys.ram[_ISR] |= 0x80;
+    if (sys.ram[_IER] & 0x80) {
+        sys.ram[_KeyBuffTop] = 0x0;
+        sys.ram[_KeyBuffBottom] = 0xf;
+        sys.ram[_KeyBuffer + 0x0f] = key & 0x3f;
+        sys.ram[_KEYCODE] = 0x00;
+    }
 }
 
 static void keyboard_cb(bool down, unsigned keycode,
@@ -822,6 +831,7 @@ static void sys_isr()
     if ((sys.ram[_ISR] & 0x80) && (sys.ram[_IER] & 0x80)) {
         idx = 0x02; // PI
         sys.ram[_ISR] &= 0x7f;
+        // Handled by 'sys_keydown'.
         return;
     } else if ((sys.ram[_ISR] & 0x01) && (sys.ram[_IER] & 0x01)) {
         idx = 0x13; // ALM
@@ -859,34 +869,9 @@ static void sys_isr()
     vrEmu6502SetPC(sys.cpu, 0x0300 + idx * 4);
 }
 
-static void sys_hook()
-{
-    uint8_t op;
- _again:
-    op = mem_read(sys.cpu->pc, false);
-    if (op == 0x20) {
-        uint16_t func = mem_read16(sys.cpu->pc + 1);
-        // __banked_function_call
-        if (func == 0xd2f6 && sys.bk_tab[0xd] == sys.bk_sys_d) {
-            func = mem_read16(__addr_reg);
-            switch (func) {
-            case 0xe7c1:        /* SysGetKey */
-                if (sys.ram[_KEYCODE] & 0x80) {
-                    sys.cpu->ac = sys.ram[_KEYCODE] & 0x3f;
-                    sys.ram[_KEYCODE] = 0;
-                } else {
-                    sys.cpu->ac = 0xff;
-                }
-                sys.cpu->pc += 3;
-                goto _again;
-            }
-        }
-    }
-}
-
 static uint32_t vrEmu6502Exec(VrEmu6502 *cpu, uint32_t cycles)
 {
-#define NEXT sys_hook(); goto *_table[mem_read(cpu->pc++, false)]
+#define NEXT goto *_table[mem_read(cpu->pc++, false)]
 #define EXIT goto _exit
     static void *_table[0x100] = {
         &&_00, &&_01, &&_02, &&_03, &&_04, &&_05, &&_06, &&_07, &&_08, &&_09, &&_0a, &&_0b, &&_0c, &&_0d, &&_0e, &&_0f,
@@ -1948,11 +1933,11 @@ static void sys_step()
     uint32_t cycles = 0;
     while (cycles < 0x12000 * vars.cpu_rate) {
         if (sys.ram[_SYSCON] & 0x08) {
-            cycles += 400 * vars.cpu_rate;
+            cycles += 256 * vars.cpu_rate;
         } else {
             for (int i = 0; i < vars.cpu_rate; i += 1) {
-                // XXX: 400 cycles seems to be a safe value for SysHalt handling..
-                cycles += vrEmu6502Exec(sys.cpu, 400);
+                // XXX: 256 cycles step seems to be a safe value for SysHalt handling..
+                cycles += vrEmu6502Exec(sys.cpu, 256);
                 if (sys.ram[_SYSCON] & 0x08)
                     break;
             }
