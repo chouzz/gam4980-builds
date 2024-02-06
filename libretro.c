@@ -1,8 +1,8 @@
 #include <stdarg.h>
 #include <stdio.h>
 #include <string.h>
+#include <stdlib.h>
 #include "libretro.h"
-#include "vrEmu6502.c"
 
 #define _DATA1          0x00
 #define _DATA2          0x01
@@ -60,8 +60,36 @@
 #define LCD_WIDTH 159
 #define LCD_HEIGHT 96
 
+static void fallback_log(enum retro_log_level level, const char *fmt, ...);
+static retro_log_printf_t       log_cb = fallback_log;
+static retro_environment_t      environ_cb;
+static retro_video_refresh_t    video_cb;
+static retro_input_poll_t       input_poll_cb;
+static retro_input_state_t      input_state_cb;
+static retro_audio_sample_t     audio_cb;
+static uint16_t                 fb[(LCD_WIDTH + 1) * LCD_HEIGHT];
+
+static void sys_isr();
+static void mem_bs(uint8_t sel);
+static uint8_t mem_read(uint16_t addr);
+static uint16_t mem_read16(uint16_t addr);
+static uint16_t mem_read16_wrapped(uint16_t addr);
+static void mem_write(uint16_t addr, uint8_t val);
+
+#define READ8(addr)       mem_read(addr)
+#define READ16(addr)      mem_read16(addr)
+#define READ16W(addr)     mem_read16_wrapped(addr)
+#define WRITE8(addr, val) mem_write(addr, val)
+#define BRK_HOOK                                      \
+    {                                                 \
+        executed = cycles;                            \
+        pc = _MACCTL;                                 \
+        environ_cb(RETRO_ENVIRONMENT_SHUTDOWN, NULL); \
+    }
+#include "s6502.c"
+
 static struct {
-    VrEmu6502   *cpu;
+    s6502_t      cpu;
     uint8_t     *mem_r[0x100];
     uint8_t    (*mem_ir[0x100])(uint16_t);
     void       (*mem_iw[0x100])(uint16_t, uint8_t);
@@ -82,17 +110,10 @@ static struct {
     uint16_t lcd_fg;
 } vars = { 1, 1, 0xd6da, 0x0000 };
 
-static void fallback_log(enum retro_log_level level, const char *fmt, ...);
-static retro_log_printf_t       log_cb = fallback_log;
-static retro_environment_t      environ_cb;
-static retro_video_refresh_t    video_cb;
-static retro_input_poll_t       input_poll_cb;
-static retro_input_state_t      input_state_cb;
-static retro_audio_sample_t     audio_cb;
-static uint16_t                 fb[(LCD_WIDTH + 1) * LCD_HEIGHT];
-
-static void sys_isr();
-static void mem_bs(uint8_t sel);
+static void s6502_push(uint8_t val)
+{
+    mem_write(0x100 | sys.cpu.sp--, val);
+}
 
 static inline uint32_t PA(uint16_t addr)
 {
@@ -428,7 +449,7 @@ static void mem_bs(uint8_t sel)
     }
 }
 
-static uint8_t mem_read(uint16_t addr, bool isDbg)
+static uint8_t mem_read(uint16_t addr)
 {
     uint8_t page = addr >> 8;
     if (sys.mem_r[page])
@@ -439,7 +460,12 @@ static uint8_t mem_read(uint16_t addr, bool isDbg)
 
 static uint16_t mem_read16(uint16_t addr)
 {
-    return mem_read(addr, false) | mem_read(addr + 1, false) << 8;
+    return mem_read(addr) | (mem_read(addr + 1) << 8);
+}
+
+static uint16_t mem_read16_wrapped(uint16_t addr)
+{
+    return mem_read(addr) | (mem_read((addr + 1) & 0xff) << 8);
 }
 
 static void mem_write(uint16_t addr, uint8_t val)
@@ -658,13 +684,16 @@ static void sys_init(const char *romdir)
     sys.ram[_INCR] = 0x0f;
 
     mem_init();
-    sys.cpu = vrEmu6502New(CPU_W65C02, mem_read, mem_write);
-    vrEmu6502SetPC(sys.cpu, 0x0350);
+    sys.cpu.pc = 0x350;
+    sys.cpu.ac = 0;
+    sys.cpu.ix = 0;
+    sys.cpu.iy = 0;
+    sys.cpu.sp = 0xff;
+    sys.cpu.status = 0x04;
 
-    // Run initialize instructions until 'main'.
-    while (!(sys.cpu->pc == 0xd2f6 &&
-             sys.ram[__addr_reg] == 0x37 && sys.ram[__addr_reg+1] == 0xe7))
-        vrEmu6502InstCycle(sys.cpu);
+
+    // Run initialize instructions.
+    s6502_exec(&sys.cpu, 0x10000);
     sys.bk_sys_d = sys.bk_tab[0xd];
 
     if (sys.bk_sys_d == 0x0e88) { /* 4988 */
@@ -686,7 +715,6 @@ static void sys_init(const char *romdir)
 
 static void sys_deinit()
 {
-    vrEmu6502Destroy(sys.cpu);
 }
 
 static void sys_load(const uint8_t *gam, size_t size)
@@ -758,10 +786,10 @@ static void sys_load(const uint8_t *gam, size_t size)
     mem_write(0x2029, 0x0d);
     mem_write(0x202a, 0x02);
     // Push game return address, 0x0260=BRK.
-    push(sys.cpu, 0x02);
-    push(sys.cpu, 0x60);
+    s6502_push(0x02);
+    s6502_push(0x60);
     // Start the game.
-    vrEmu6502SetPC(sys.cpu, start);
+    sys.cpu.pc = start;
 }
 
 static void sys_timer(uint32_t n)
@@ -826,7 +854,7 @@ static void sys_rtc()
 static void sys_isr()
 {
     uint8_t idx = 0;
-    if (sys.cpu->flags & FlagI)
+    if (sys.cpu.status & 0x04)
         return;
     if ((sys.ram[_ISR] & 0x80) && (sys.ram[_IER] & 0x80)) {
         idx = 0x02; // PI
@@ -862,1070 +890,11 @@ static void sys_isr()
         return;
     }
 
-    push(sys.cpu, sys.cpu->pc >> 8);
-    push(sys.cpu, sys.cpu->pc & 0xff);
-    push(sys.cpu, sys.cpu->flags);
-    setBit(sys.cpu, FlagI);
-    vrEmu6502SetPC(sys.cpu, 0x0300 + idx * 4);
-}
-
-static uint32_t vrEmu6502Exec(VrEmu6502 *cpu, uint32_t cycles)
-{
-#define NEXT goto *_table[mem_read(cpu->pc++, false)]
-#define EXIT goto _exit
-    static void *_table[0x100] = {
-        &&_00, &&_01, &&_02, &&_03, &&_04, &&_05, &&_06, &&_07, &&_08, &&_09, &&_0a, &&_0b, &&_0c, &&_0d, &&_0e, &&_0f,
-        &&_10, &&_11, &&_12, &&_13, &&_14, &&_15, &&_16, &&_17, &&_18, &&_19, &&_1a, &&_1b, &&_1c, &&_1d, &&_1e, &&_1f,
-        &&_20, &&_21, &&_22, &&_23, &&_24, &&_25, &&_26, &&_27, &&_28, &&_29, &&_2a, &&_2b, &&_2c, &&_2d, &&_2e, &&_2f,
-        &&_30, &&_31, &&_32, &&_33, &&_34, &&_35, &&_36, &&_37, &&_38, &&_39, &&_3a, &&_3b, &&_3c, &&_3d, &&_3e, &&_3f,
-        &&_40, &&_41, &&_42, &&_43, &&_44, &&_45, &&_46, &&_47, &&_48, &&_49, &&_4a, &&_4b, &&_4c, &&_4d, &&_4e, &&_4f,
-        &&_50, &&_51, &&_52, &&_53, &&_54, &&_55, &&_56, &&_57, &&_58, &&_59, &&_5a, &&_5b, &&_5c, &&_5d, &&_5e, &&_5f,
-        &&_60, &&_61, &&_62, &&_63, &&_64, &&_65, &&_66, &&_67, &&_68, &&_69, &&_6a, &&_6b, &&_6c, &&_6d, &&_6e, &&_6f,
-        &&_70, &&_71, &&_72, &&_73, &&_74, &&_75, &&_76, &&_77, &&_78, &&_79, &&_7a, &&_7b, &&_7c, &&_7d, &&_7e, &&_7f,
-        &&_80, &&_81, &&_82, &&_83, &&_84, &&_85, &&_86, &&_87, &&_88, &&_89, &&_8a, &&_8b, &&_8c, &&_8d, &&_8e, &&_8f,
-        &&_90, &&_91, &&_92, &&_93, &&_94, &&_95, &&_96, &&_97, &&_98, &&_99, &&_9a, &&_9b, &&_9c, &&_9d, &&_9e, &&_9f,
-        &&_a0, &&_a1, &&_a2, &&_a3, &&_a4, &&_a5, &&_a6, &&_a7, &&_a8, &&_a9, &&_aa, &&_ab, &&_ac, &&_ad, &&_ae, &&_af,
-        &&_b0, &&_b1, &&_b2, &&_b3, &&_b4, &&_b5, &&_b6, &&_b7, &&_b8, &&_b9, &&_ba, &&_bb, &&_bc, &&_bd, &&_be, &&_bf,
-        &&_c0, &&_c1, &&_c2, &&_c3, &&_c4, &&_c5, &&_c6, &&_c7, &&_c8, &&_c9, &&_ca, &&_cb, &&_cc, &&_cd, &&_ce, &&_cf,
-        &&_d0, &&_d1, &&_d2, &&_d3, &&_d4, &&_d5, &&_d6, &&_d7, &&_d8, &&_d9, &&_da, &&_db, &&_dc, &&_dd, &&_de, &&_df,
-        &&_e0, &&_e1, &&_e2, &&_e3, &&_e4, &&_e5, &&_e6, &&_e7, &&_e8, &&_e9, &&_ea, &&_eb, &&_ec, &&_ed, &&_ee, &&_ef,
-        &&_f0, &&_f1, &&_f2, &&_f3, &&_f4, &&_f5, &&_f6, &&_f7, &&_f8, &&_f9, &&_fa, &&_fb, &&_fc, &&_fd, &&_fe, &&_ff,
-    };
-    uint32_t count = 0;
-_exit:
-    if (count >= cycles || (sys.ram[_SYSCON] & 0x08))
-        return count;
-    else
-        NEXT;
-_00:
-    // brk(cpu, imp);
-    // count += 7;
-    // Upon BRK, shutdown the game.
-    count = cycles;
-    sys.ram[_SYSCON] |= 0x08;
-    sys.cpu->pc = _MACCTL;
-    environ_cb(RETRO_ENVIRONMENT_SHUTDOWN, NULL);
-    EXIT;
-_01:
-    ora(cpu, xin);
-    count += 6;
-    NEXT;
-_02:
-    ldd(cpu, imm);
-    count += 2;
-    NEXT;
-_03:
-    nop(cpu, imp);
-    count += 1;
-    NEXT;
-_04:
-    tsb(cpu, zp);
-    count += 5;
-    NEXT;
-_05:
-    ora(cpu, zp);
-    count += 3;
-    NEXT;
-_06:
-    asl(cpu, zp);
-    count += 5;
-    NEXT;
-_07:
-    rmb0(cpu, zp);
-    count += 5;
-    NEXT;
-_08:
-    php(cpu, imp);
-    count += 3;
-    NEXT;
-_09:
-    ora(cpu, imm);
-    count += 2;
-    NEXT;
-_0a:
-    asl(cpu, acc);
-    count += 2;
-    NEXT;
-_0b:
-    nop(cpu, imp);
-    count += 1;
-    NEXT;
-_0c:
-    tsb(cpu, ab);
-    count += 6;
-    NEXT;
-_0d:
-    ora(cpu, ab);
-    count += 4;
-    NEXT;
-_0e:
-    asl(cpu, ab);
-    count += 6;
-    NEXT;
-_0f:
-    bbr0(cpu, zp);
-    count += 5;
-    NEXT;
-_10:
-    bpl(cpu, rel);
-    count += 2;
-    NEXT;
-_11:
-    ora(cpu, yip);
-    count += 5;
-    NEXT;
-_12:
-    ora(cpu, zpi);
-    count += 5;
-    NEXT;
-_13:
-    nop(cpu, imp);
-    count += 1;
-    NEXT;
-_14:
-    trb(cpu, zp);
-    count += 5;
-    NEXT;
-_15:
-    ora(cpu, zpx);
-    count += 4;
-    NEXT;
-_16:
-    asl(cpu, zpx);
-    count += 6;
-    NEXT;
-_17:
-    rmb1(cpu, zp);
-    count += 5;
-    NEXT;
-_18:
-    clc(cpu, imp);
-    count += 2;
-    NEXT;
-_19:
-    ora(cpu, ayp);
-    count += 4;
-    NEXT;
-_1a:
-    inc(cpu, acc);
-    count += 2;
-    NEXT;
-_1b:
-    nop(cpu, imp);
-    count += 1;
-    NEXT;
-_1c:
-    trb(cpu, ab);
-    count += 6;
-    NEXT;
-_1d:
-    ora(cpu, axp);
-    count += 4;
-    NEXT;
-_1e:
-    asl(cpu, axp);
-    count += 6;
-    NEXT;
-_1f:
-    bbr1(cpu, zp);
-    count += 5;
-    NEXT;
-_20:
-    jsr(cpu, ab);
-    count += 6;
-    NEXT;
-_21:
-    and(cpu, xin);
-    count += 6;
-    NEXT;
-_22:
-    ldd(cpu, imm);
-    count += 2;
-    NEXT;
-_23:
-    nop(cpu, imp);
-    count += 1;
-    NEXT;
-_24:
-    bit(cpu, zp);
-    count += 3;
-    NEXT;
-_25:
-    and(cpu, zp);
-    count += 3;
-    NEXT;
-_26:
-    rol(cpu, zp);
-    count += 5;
-    NEXT;
-_27:
-    rmb2(cpu, zp);
-    count += 5;
-    NEXT;
-_28:
-    plp(cpu, imp);
-    count += 4;
-    NEXT;
-_29:
-    and(cpu, imm);
-    count += 2;
-    NEXT;
-_2a:
-    rol(cpu, acc);
-    count += 2;
-    NEXT;
-_2b:
-    nop(cpu, imp);
-    count += 1;
-    NEXT;
-_2c:
-    bit(cpu, ab);
-    count += 4;
-    NEXT;
-_2d:
-    and(cpu, ab);
-    count += 4;
-    NEXT;
-_2e:
-    rol(cpu, ab);
-    count += 6;
-    NEXT;
-_2f:
-    bbr2(cpu, zp);
-    count += 5;
-    NEXT;
-_30:
-    bmi(cpu, rel);
-    count += 2;
-    NEXT;
-_31:
-    and(cpu, yip);
-    count += 5;
-    NEXT;
-_32:
-    and(cpu, zpi);
-    count += 5;
-    NEXT;
-_33:
-    nop(cpu, imp);
-    count += 1;
-    NEXT;
-_34:
-    bit(cpu, zpx);
-    count += 4;
-    NEXT;
-_35:
-    and(cpu, zpx);
-    count += 4;
-    NEXT;
-_36:
-    rol(cpu, zpx);
-    count += 6;
-    NEXT;
-_37:
-    rmb3(cpu, zp);
-    count += 5;
-    NEXT;
-_38:
-    sec(cpu, imp);
-    count += 2;
-    NEXT;
-_39:
-    and(cpu, ayp);
-    count += 4;
-    NEXT;
-_3a:
-    dec(cpu, acc);
-    count += 2;
-    NEXT;
-_3b:
-    nop(cpu, imp);
-    count += 1;
-    NEXT;
-_3c:
-    bit(cpu, abx);
-    count += 4;
-    NEXT;
-_3d:
-    and(cpu, axp);
-    count += 4;
-    NEXT;
-_3e:
-    rol(cpu, axp);
-    count += 6;
-    NEXT;
-_3f:
-    bbr3(cpu, zp);
-    count += 5;
-    NEXT;
-_40:
-    rti(cpu, imp);
-    count += 6;
-    EXIT;
-_41:
-    eor(cpu, xin);
-    count += 6;
-    NEXT;
-_42:
-    ldd(cpu, imm);
-    count += 2;
-    NEXT;
-_43:
-    nop(cpu, imp);
-    count += 1;
-    NEXT;
-_44:
-    ldd(cpu, zp);
-    count += 3;
-    NEXT;
-_45:
-    eor(cpu, zp);
-    count += 3;
-    NEXT;
-_46:
-    lsr(cpu, zp);
-    count += 5;
-    NEXT;
-_47:
-    rmb4(cpu, zp);
-    count += 5;
-    NEXT;
-_48:
-    pha(cpu, imp);
-    count += 3;
-    NEXT;
-_49:
-    eor(cpu, imm);
-    count += 2;
-    NEXT;
-_4a:
-    lsr(cpu, acc);
-    count += 2;
-    NEXT;
-_4b:
-    nop(cpu, imp);
-    count += 1;
-    NEXT;
-_4c:
-    jmp(cpu, ab);
-    count += 3;
-    EXIT;
-_4d:
-    eor(cpu, ab);
-    count += 4;
-    NEXT;
-_4e:
-    lsr(cpu, ab);
-    count += 6;
-    NEXT;
-_4f:
-    bbr4(cpu, zp);
-    count += 5;
-    NEXT;
-_50:
-    bvc(cpu, rel);
-    count += 2;
-    NEXT;
-_51:
-    eor(cpu, yip);
-    count += 5;
-    NEXT;
-_52:
-    eor(cpu, zpi);
-    count += 5;
-    NEXT;
-_53:
-    nop(cpu, imp);
-    count += 1;
-    NEXT;
-_54:
-    ldd(cpu, zpx);
-    count += 4;
-    NEXT;
-_55:
-    eor(cpu, zpx);
-    count += 4;
-    NEXT;
-_56:
-    lsr(cpu, zpx);
-    count += 6;
-    NEXT;
-_57:
-    rmb5(cpu, zp);
-    count += 5;
-    NEXT;
-_58:
-    cli(cpu, imp);
-    count += 2;
-    NEXT;
-_59:
-    eor(cpu, ayp);
-    count += 4;
-    NEXT;
-_5a:
-    phy(cpu, imp);
-    count += 3;
-    NEXT;
-_5b:
-    nop(cpu, imp);
-    count += 1;
-    NEXT;
-_5c:
-    ldd(cpu, ab);
-    count += 8;
-    NEXT;
-_5d:
-    eor(cpu, axp);
-    count += 4;
-    NEXT;
-_5e:
-    lsr(cpu, axp);
-    count += 6;
-    NEXT;
-_5f:
-    bbr5(cpu, zp);
-    count += 5;
-    NEXT;
-_60:
-    rts(cpu, imp);
-    count += 6;
-    EXIT;
-_61:
-    adc(cpu, xin);
-    count += 6;
-    NEXT;
-_62:
-    ldd(cpu, imm);
-    count += 2;
-    NEXT;
-_63:
-    nop(cpu, imp);
-    count += 1;
-    NEXT;
-_64:
-    stz(cpu, zp);
-    count += 3;
-    NEXT;
-_65:
-    adc(cpu, zp);
-    count += 3;
-    NEXT;
-_66:
-    ror(cpu, zp);
-    count += 5;
-    NEXT;
-_67:
-    rmb6(cpu, zp);
-    count += 5;
-    NEXT;
-_68:
-    pla(cpu, imp);
-    count += 4;
-    NEXT;
-_69:
-    adc(cpu, imm);
-    count += 2;
-    NEXT;
-_6a:
-    ror(cpu, acc);
-    count += 2;
-    NEXT;
-_6b:
-    nop(cpu, imp);
-    count += 1;
-    NEXT;
-_6c:
-    jmp(cpu, ind);
-    count += 6;
-    NEXT;
-_6d:
-    adc(cpu, ab);
-    count += 4;
-    NEXT;
-_6e:
-    ror(cpu, ab);
-    count += 6;
-    NEXT;
-_6f:
-    bbr6(cpu, zp);
-    count += 5;
-    NEXT;
-_70:
-    bvs(cpu, rel);
-    count += 2;
-    NEXT;
-_71:
-    adc(cpu, yip);
-    count += 5;
-    NEXT;
-_72:
-    adc(cpu, zpi);
-    count += 5;
-    NEXT;
-_73:
-    nop(cpu, imp);
-    count += 1;
-    NEXT;
-_74:
-    stz(cpu, zpx);
-    count += 4;
-    NEXT;
-_75:
-    adc(cpu, zpx);
-    count += 4;
-    NEXT;
-_76:
-    ror(cpu, zpx);
-    count += 6;
-    NEXT;
-_77:
-    rmb7(cpu, zp);
-    count += 5;
-    NEXT;
-_78:
-    sei(cpu, imp);
-    count += 2;
-    NEXT;
-_79:
-    adc(cpu, ayp);
-    count += 4;
-    NEXT;
-_7a:
-    ply(cpu, imp);
-    count += 4;
-    NEXT;
-_7b:
-    nop(cpu, imp);
-    count += 1;
-    NEXT;
-_7c:
-    jmp(cpu, indx);
-    count += 6;
-    NEXT;
-_7d:
-    adc(cpu, axp);
-    count += 4;
-    NEXT;
-_7e:
-    ror(cpu, axp);
-    count += 6;
-    NEXT;
-_7f:
-    bbr7(cpu, zp);
-    count += 5;
-    NEXT;
-_80:
-    bra(cpu, rel);
-    count += 2;
-    NEXT;
-_81:
-    sta(cpu, xin);
-    count += 6;
-    NEXT;
-_82:
-    ldd(cpu, imm);
-    count += 2;
-    NEXT;
-_83:
-    nop(cpu, imp);
-    count += 1;
-    NEXT;
-_84:
-    sty(cpu, zp);
-    count += 3;
-    NEXT;
-_85:
-    sta(cpu, zp);
-    count += 3;
-    NEXT;
-_86:
-    stx(cpu, zp);
-    count += 3;
-    NEXT;
-_87:
-    smb0(cpu, zp);
-    count += 5;
-    NEXT;
-_88:
-    dey(cpu, imp);
-    count += 2;
-    NEXT;
-_89:
-    bit(cpu, imm);
-    count += 2;
-    NEXT;
-_8a:
-    txa(cpu, imp);
-    count += 2;
-    NEXT;
-_8b:
-    nop(cpu, imp);
-    count += 1;
-    NEXT;
-_8c:
-    sty(cpu, ab);
-    count += 4;
-    NEXT;
-_8d:
-    sta(cpu, ab);
-    count += 4;
-    NEXT;
-_8e:
-    stx(cpu, ab);
-    count += 4;
-    NEXT;
-_8f:
-    bbs0(cpu, zp);
-    count += 5;
-    NEXT;
-_90:
-    bcc(cpu, rel);
-    count += 2;
-    NEXT;
-_91:
-    sta(cpu, yin);
-    count += 6;
-    NEXT;
-_92:
-    sta(cpu, zpi);
-    count += 5;
-    NEXT;
-_93:
-    nop(cpu, imp);
-    count += 1;
-    NEXT;
-_94:
-    sty(cpu, zpx);
-    count += 4;
-    NEXT;
-_95:
-    sta(cpu, zpx);
-    count += 4;
-    NEXT;
-_96:
-    stx(cpu, zpy);
-    count += 4;
-    NEXT;
-_97:
-    smb1(cpu, zp);
-    count += 5;
-    NEXT;
-_98:
-    tya(cpu, imp);
-    count += 2;
-    NEXT;
-_99:
-    sta(cpu, aby);
-    count += 5;
-    NEXT;
-_9a:
-    txs(cpu, imp);
-    count += 2;
-    NEXT;
-_9b:
-    nop(cpu, imp);
-    count += 1;
-    NEXT;
-_9c:
-    stz(cpu, ab);
-    count += 4;
-    NEXT;
-_9d:
-    sta(cpu, abx);
-    count += 5;
-    NEXT;
-_9e:
-    stz(cpu, abx);
-    count += 5;
-    NEXT;
-_9f:
-    bbs1(cpu, zp);
-    count += 5;
-    NEXT;
-_a0:
-    ldy(cpu, imm);
-    count += 2;
-    NEXT;
-_a1:
-    lda(cpu, xin);
-    count += 6;
-    NEXT;
-_a2:
-    ldx(cpu, imm);
-    count += 2;
-    NEXT;
-_a3:
-    nop(cpu, imp);
-    count += 1;
-    NEXT;
-_a4:
-    ldy(cpu, zp);
-    count += 3;
-    NEXT;
-_a5:
-    lda(cpu, zp);
-    count += 3;
-    NEXT;
-_a6:
-    ldx(cpu, zp);
-    count += 3;
-    NEXT;
-_a7:
-    smb2(cpu, zp);
-    count += 5;
-    NEXT;
-_a8:
-    tay(cpu, imp);
-    count += 2;
-    NEXT;
-_a9:
-    lda(cpu, imm);
-    count += 2;
-    NEXT;
-_aa:
-    tax(cpu, imp);
-    count += 2;
-    NEXT;
-_ab:
-    nop(cpu, imp);
-    count += 1;
-    NEXT;
-_ac:
-    ldy(cpu, ab);
-    count += 4;
-    NEXT;
-_ad:
-    lda(cpu, ab);
-    count += 4;
-    NEXT;
-_ae:
-    ldx(cpu, ab);
-    count += 4;
-    NEXT;
-_af:
-    bbs2(cpu, zp);
-    count += 5;
-    NEXT;
-_b0:
-    bcs(cpu, rel);
-    count += 2;
-    NEXT;
-_b1:
-    lda(cpu, yip);
-    count += 5;
-    NEXT;
-_b2:
-    lda(cpu, zpi);
-    count += 5;
-    NEXT;
-_b3:
-    nop(cpu, imp);
-    count += 1;
-    NEXT;
-_b4:
-    ldy(cpu, zpx);
-    count += 4;
-    NEXT;
-_b5:
-    lda(cpu, zpx);
-    count += 4;
-    NEXT;
-_b6:
-    ldx(cpu, zpy);
-    count += 4;
-    NEXT;
-_b7:
-    smb3(cpu, zp);
-    count += 5;
-    NEXT;
-_b8:
-    clv(cpu, imp);
-    count += 2;
-    NEXT;
-_b9:
-    lda(cpu, ayp);
-    count += 4;
-    NEXT;
-_ba:
-    tsx(cpu, imp);
-    count += 2;
-    NEXT;
-_bb:
-    nop(cpu, imp);
-    count += 1;
-    NEXT;
-_bc:
-    ldy(cpu, axp);
-    count += 4;
-    NEXT;
-_bd:
-    lda(cpu, axp);
-    count += 4;
-    NEXT;
-_be:
-    ldx(cpu, ayp);
-    count += 4;
-    NEXT;
-_bf:
-    bbs3(cpu, zp);
-    count += 5;
-    NEXT;
-_c0:
-    cpy(cpu, imm);
-    count += 2;
-    NEXT;
-_c1:
-    cmp(cpu, xin);
-    count += 6;
-    NEXT;
-_c2:
-    ldd(cpu, imm);
-    count += 2;
-    NEXT;
-_c3:
-    nop(cpu, imp);
-    count += 1;
-    NEXT;
-_c4:
-    cpy(cpu, zp);
-    count += 3;
-    NEXT;
-_c5:
-    cmp(cpu, zp);
-    count += 3;
-    NEXT;
-_c6:
-    dec(cpu, zp);
-    count += 5;
-    NEXT;
-_c7:
-    smb4(cpu, zp);
-    count += 5;
-    NEXT;
-_c8:
-    iny(cpu, imp);
-    count += 2;
-    NEXT;
-_c9:
-    cmp(cpu, imm);
-    count += 2;
-    NEXT;
-_ca:
-    dex(cpu, imp);
-    count += 2;
-    NEXT;
-_cb:
-    wai(cpu, imp);
-    count += 3;
-    NEXT;
-_cc:
-    cpy(cpu, ab);
-    count += 4;
-    NEXT;
-_cd:
-    cmp(cpu, ab);
-    count += 4;
-    NEXT;
-_ce:
-    dec(cpu, ab);
-    count += 6;
-    NEXT;
-_cf:
-    bbs4(cpu, zp);
-    count += 5;
-    NEXT;
-_d0:
-    bne(cpu, rel);
-    count += 2;
-    NEXT;
-_d1:
-    cmp(cpu, yip);
-    count += 5;
-    NEXT;
-_d2:
-    cmp(cpu, zpi);
-    count += 5;
-    NEXT;
-_d3:
-    nop(cpu, imp);
-    count += 1;
-    NEXT;
-_d4:
-    ldd(cpu, zpx);
-    count += 4;
-    NEXT;
-_d5:
-    cmp(cpu, zpx);
-    count += 4;
-    NEXT;
-_d6:
-    dec(cpu, zpx);
-    count += 6;
-    NEXT;
-_d7:
-    smb5(cpu, zp);
-    count += 5;
-    NEXT;
-_d8:
-    cld(cpu, imp);
-    count += 2;
-    NEXT;
-_d9:
-    cmp(cpu, ayp);
-    count += 4;
-    NEXT;
-_da:
-    phx(cpu, imp);
-    count += 3;
-    NEXT;
-_db:
-    stp(cpu, imp);
-    count += 3;
-    NEXT;
-_dc:
-    ldd(cpu, ab);
-    count += 4;
-    NEXT;
-_dd:
-    cmp(cpu, axp);
-    count += 4;
-    NEXT;
-_de:
-    dec(cpu, abx);
-    count += 7;
-    NEXT;
-_df:
-    bbs5(cpu, zp);
-    count += 5;
-    NEXT;
-_e0:
-    cpx(cpu, imm);
-    count += 2;
-    NEXT;
-_e1:
-    sbc(cpu, xin);
-    count += 6;
-    NEXT;
-_e2:
-    ldd(cpu, imm);
-    count += 2;
-    NEXT;
-_e3:
-    nop(cpu, imp);
-    count += 1;
-    NEXT;
-_e4:
-    cpx(cpu, zp);
-    count += 3;
-    NEXT;
-_e5:
-    sbc(cpu, zp);
-    count += 3;
-    NEXT;
-_e6:
-    inc(cpu, zp);
-    count += 5;
-    NEXT;
-_e7:
-    smb6(cpu, zp);
-    count += 5;
-    NEXT;
-_e8:
-    inx(cpu, imp);
-    count += 2;
-    NEXT;
-_e9:
-    sbc(cpu, imm);
-    count += 2;
-    NEXT;
-_ea:
-    nop(cpu, imp);
-    count += 2;
-    NEXT;
-_eb:
-    nop(cpu, imp);
-    count += 1;
-    NEXT;
-_ec:
-    cpx(cpu, ab);
-    count += 4;
-    NEXT;
-_ed:
-    sbc(cpu, ab);
-    count += 4;
-    NEXT;
-_ee:
-    inc(cpu, ab);
-    count += 6;
-    NEXT;
-_ef:
-    bbs6(cpu, zp);
-    count += 5;
-    NEXT;
-_f0:
-    beq(cpu, rel);
-    count += 2;
-    NEXT;
-_f1:
-    sbc(cpu, yip);
-    count += 5;
-    NEXT;
-_f2:
-    sbc(cpu, zpi);
-    count += 5;
-    NEXT;
-_f3:
-    nop(cpu, imp);
-    count += 1;
-    NEXT;
-_f4:
-    ldd(cpu, zpx);
-    count += 4;
-    NEXT;
-_f5:
-    sbc(cpu, zpx);
-    count += 4;
-    NEXT;
-_f6:
-    inc(cpu, zpx);
-    count += 6;
-    NEXT;
-_f7:
-    smb7(cpu, zp);
-    count += 5;
-    NEXT;
-_f8:
-    sed(cpu, imp);
-    count += 2;
-    NEXT;
-_f9:
-    sbc(cpu, ayp);
-    count += 4;
-    NEXT;
-_fa:
-    plx(cpu, imp);
-    count += 4;
-    NEXT;
-_fb:
-    nop(cpu, imp);
-    count += 1;
-    NEXT;
-_fc:
-    ldd(cpu, ab);
-    count += 4;
-    NEXT;
-_fd:
-    sbc(cpu, axp);
-    count += 4;
-    NEXT;
-_fe:
-    inc(cpu, abx);
-    count += 7;
-    NEXT;
-_ff:
-    bbs7(cpu, zp);
-    count += 5;
-    NEXT;
+    s6502_push(sys.cpu.pc >> 8);
+    s6502_push(sys.cpu.pc & 0xff);
+    s6502_push(sys.cpu.status);
+    sys.cpu.status |= 0x04;
+    sys.cpu.pc = 0x0300 + idx * 4;
 }
 
 static void sys_step()
@@ -1937,7 +906,7 @@ static void sys_step()
         } else {
             for (int i = 0; i < vars.cpu_rate; i += 1) {
                 // XXX: 400 cycles step seems to be a safe value for SysHalt handling..
-                cycles += vrEmu6502Exec(sys.cpu, 400);
+                cycles += s6502_exec(&sys.cpu, 400);
                 if (sys.ram[_SYSCON] & 0x08)
                     break;
             }
