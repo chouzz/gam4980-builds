@@ -72,12 +72,16 @@ static uint16_t                 fb[(LCD_WIDTH + 1) * LCD_HEIGHT];
 static void sys_isr();
 static void mem_bs(uint8_t sel);
 static uint8_t mem_read(uint16_t addr);
+static uint8_t mem_readx(uint16_t addr);
 static uint16_t mem_read16(uint16_t addr);
+static uint16_t mem_readx16(uint16_t addr);
 static uint16_t mem_read16_wrapped(uint16_t addr);
 static void mem_write(uint16_t addr, uint8_t val);
 
 #define READ8(addr)       mem_read(addr)
+#define READX8(addr)      mem_readx(addr)
 #define READ16(addr)      mem_read16(addr)
+#define READX16(addr)     mem_readx16(addr)
 #define READ16W(addr)     mem_read16_wrapped(addr)
 #define WRITE8(addr, val) mem_write(addr, val)
 #define BRK_HOOK                                      \
@@ -449,6 +453,12 @@ static void mem_bs(uint8_t sel)
     }
 }
 
+static uint8_t mem_readx(uint16_t addr)
+{
+    uint8_t page = addr >> 8;
+    return sys.mem_r[page][addr & 0xff];
+}
+
 static uint8_t mem_read(uint16_t addr)
 {
     uint8_t page = addr >> 8;
@@ -461,6 +471,11 @@ static uint8_t mem_read(uint16_t addr)
 static uint16_t mem_read16(uint16_t addr)
 {
     return mem_read(addr) | (mem_read(addr + 1) << 8);
+}
+
+static uint16_t mem_readx16(uint16_t addr)
+{
+    return mem_readx(addr) | (mem_readx(addr + 1) << 8);
 }
 
 static uint16_t mem_read16_wrapped(uint16_t addr)

@@ -75,7 +75,6 @@ uint32_t s6502_exec(s6502_t *u, uint32_t cycles) {
 #define POP(x) READ8((0x100 | ++sp))
   {
     uint32_t executed = 0;
-    uint8_t opcode = 0;
     uint8_t dt = 0;
     uint16_t et = 0;
     uint16_t ea = 0;
@@ -98,13 +97,13 @@ uint32_t s6502_exec(s6502_t *u, uint32_t cycles) {
       NEXT;
     };
   _next:
-    goto *_table[READ8(pc++)];
+    goto *_table[READX8(pc++)];
   _00:
     BRK_HOOK;
     CYCLES(7);
     EXIT;
   _01:
-    ea = READ16W((0xff & (READ8(pc) + ix)));
+    ea = READ16W((0xff & (READX8(pc) + ix)));
     pc = (pc + 1);
     ac = (ac | READ8(ea));
     SET_NZ(ac);
@@ -120,7 +119,7 @@ uint32_t s6502_exec(s6502_t *u, uint32_t cycles) {
     CYCLES(1);
     NEXT;
   _04:
-    ea = READ8(pc);
+    ea = READX8(pc);
     pc = (pc + 1);
     dt = READ8(ea);
     WRITE8(ea, (dt | ac));
@@ -128,14 +127,14 @@ uint32_t s6502_exec(s6502_t *u, uint32_t cycles) {
     CYCLES(5);
     NEXT;
   _05:
-    ea = READ8(pc);
+    ea = READX8(pc);
     pc = (pc + 1);
     ac = (ac | READ8(ea));
     SET_NZ(ac);
     CYCLES(3);
     NEXT;
   _06:
-    ea = READ8(pc);
+    ea = READX8(pc);
     pc = (pc + 1);
     dt = READ8(ea);
     SET_C((0x80 & dt));
@@ -145,7 +144,7 @@ uint32_t s6502_exec(s6502_t *u, uint32_t cycles) {
     CYCLES(5);
     NEXT;
   _07:
-    ea = READ8(pc);
+    ea = READX8(pc);
     pc = (pc + 1);
     dt = READ8(ea);
     WRITE8(ea, (dt & ~(0x01 << 0)));
@@ -172,7 +171,7 @@ uint32_t s6502_exec(s6502_t *u, uint32_t cycles) {
     CYCLES(1);
     NEXT;
   _0c:
-    ea = READ16(pc);
+    ea = READX16(pc);
     pc = (pc + 2);
     dt = READ8(ea);
     WRITE8(ea, (dt | ac));
@@ -180,14 +179,14 @@ uint32_t s6502_exec(s6502_t *u, uint32_t cycles) {
     CYCLES(6);
     NEXT;
   _0d:
-    ea = READ16(pc);
+    ea = READX16(pc);
     pc = (pc + 2);
     ac = (ac | READ8(ea));
     SET_NZ(ac);
     CYCLES(4);
     NEXT;
   _0e:
-    ea = READ16(pc);
+    ea = READX16(pc);
     pc = (pc + 2);
     dt = READ8(ea);
     SET_C((0x80 & dt));
@@ -197,11 +196,11 @@ uint32_t s6502_exec(s6502_t *u, uint32_t cycles) {
     CYCLES(6);
     NEXT;
   _0f:
-    ea = READ8(pc);
+    ea = READX8(pc);
     pc = (pc + 1);
     dt = READ8(ea);
     if (!(dt & (0x01 << 0))) {
-      ea = (pc + 1 + ((int8_t)(READ8(pc))));
+      ea = (pc + 1 + ((int8_t)(READX8(pc))));
       pc = (pc + 1);
       pc = ea;
     } else {
@@ -210,7 +209,7 @@ uint32_t s6502_exec(s6502_t *u, uint32_t cycles) {
     CYCLES(5);
     NEXT;
   _10:
-    ea = (pc + 1 + ((int8_t)(READ8(pc))));
+    ea = (pc + 1 + ((int8_t)(READX8(pc))));
     pc = (pc + 1);
     if (!NEGATIVE_p) {
       CYCLES(1);
@@ -220,7 +219,7 @@ uint32_t s6502_exec(s6502_t *u, uint32_t cycles) {
     CYCLES(2);
     NEXT;
   _11:
-    et = READ16W((READ8(pc)));
+    et = READ16W((READX8(pc)));
     pc = (pc + 1);
     ea = (et + iy);
     CYCLES((!!(0xff00 & (et ^ ea))));
@@ -229,7 +228,7 @@ uint32_t s6502_exec(s6502_t *u, uint32_t cycles) {
     CYCLES(5);
     NEXT;
   _12:
-    ea = READ16W((READ8(pc)));
+    ea = READ16W((READX8(pc)));
     pc = (pc + 1);
     ac = (ac | READ8(ea));
     SET_NZ(ac);
@@ -239,7 +238,7 @@ uint32_t s6502_exec(s6502_t *u, uint32_t cycles) {
     CYCLES(1);
     NEXT;
   _14:
-    ea = READ8(pc);
+    ea = READX8(pc);
     pc = (pc + 1);
     dt = READ8(ea);
     WRITE8(ea, (dt & ~ac));
@@ -247,14 +246,14 @@ uint32_t s6502_exec(s6502_t *u, uint32_t cycles) {
     CYCLES(5);
     NEXT;
   _15:
-    ea = ((ix + READ8(pc)) & 0xff);
+    ea = ((ix + READX8(pc)) & 0xff);
     pc = (pc + 1);
     ac = (ac | READ8(ea));
     SET_NZ(ac);
     CYCLES(4);
     NEXT;
   _16:
-    ea = ((ix + READ8(pc)) & 0xff);
+    ea = ((ix + READX8(pc)) & 0xff);
     pc = (pc + 1);
     dt = READ8(ea);
     SET_C((0x80 & dt));
@@ -264,7 +263,7 @@ uint32_t s6502_exec(s6502_t *u, uint32_t cycles) {
     CYCLES(6);
     NEXT;
   _17:
-    ea = READ8(pc);
+    ea = READX8(pc);
     pc = (pc + 1);
     dt = READ8(ea);
     WRITE8(ea, (dt & ~(0x01 << 1)));
@@ -275,7 +274,7 @@ uint32_t s6502_exec(s6502_t *u, uint32_t cycles) {
     CYCLES(2);
     NEXT;
   _19:
-    et = READ16(pc);
+    et = READX16(pc);
     ea = (et + iy);
     pc = (pc + 2);
     CYCLES((!!(0xff00 & (et ^ ea))));
@@ -292,7 +291,7 @@ uint32_t s6502_exec(s6502_t *u, uint32_t cycles) {
     CYCLES(1);
     NEXT;
   _1c:
-    ea = READ16(pc);
+    ea = READX16(pc);
     pc = (pc + 2);
     dt = READ8(ea);
     WRITE8(ea, (dt & ~ac));
@@ -300,7 +299,7 @@ uint32_t s6502_exec(s6502_t *u, uint32_t cycles) {
     CYCLES(6);
     NEXT;
   _1d:
-    et = READ16(pc);
+    et = READX16(pc);
     ea = (et + ix);
     pc = (pc + 2);
     CYCLES((!!(0xff00 & (et ^ ea))));
@@ -309,7 +308,7 @@ uint32_t s6502_exec(s6502_t *u, uint32_t cycles) {
     CYCLES(4);
     NEXT;
   _1e:
-    et = READ16(pc);
+    et = READX16(pc);
     ea = (et + ix);
     pc = (pc + 2);
     CYCLES((!!(0xff00 & (et ^ ea))));
@@ -321,11 +320,11 @@ uint32_t s6502_exec(s6502_t *u, uint32_t cycles) {
     CYCLES(6);
     NEXT;
   _1f:
-    ea = READ8(pc);
+    ea = READX8(pc);
     pc = (pc + 1);
     dt = READ8(ea);
     if (!(dt & (0x01 << 1))) {
-      ea = (pc + 1 + ((int8_t)(READ8(pc))));
+      ea = (pc + 1 + ((int8_t)(READX8(pc))));
       pc = (pc + 1);
       pc = ea;
     } else {
@@ -334,7 +333,7 @@ uint32_t s6502_exec(s6502_t *u, uint32_t cycles) {
     CYCLES(5);
     NEXT;
   _20:
-    ea = READ16(pc);
+    ea = READX16(pc);
     pc = (pc + 2);
     pc = (pc - 1);
     PUSH((pc >> 8));
@@ -343,7 +342,7 @@ uint32_t s6502_exec(s6502_t *u, uint32_t cycles) {
     CYCLES(6);
     NEXT;
   _21:
-    ea = READ16W((0xff & (READ8(pc) + ix)));
+    ea = READ16W((0xff & (READX8(pc) + ix)));
     pc = (pc + 1);
     ac = (ac & READ8(ea));
     SET_NZ(ac);
@@ -359,7 +358,7 @@ uint32_t s6502_exec(s6502_t *u, uint32_t cycles) {
     CYCLES(1);
     NEXT;
   _24:
-    ea = READ8(pc);
+    ea = READX8(pc);
     pc = (pc + 1);
     dt = READ8(ea);
     SET_V((dt & 0x40));
@@ -368,14 +367,14 @@ uint32_t s6502_exec(s6502_t *u, uint32_t cycles) {
     CYCLES(3);
     NEXT;
   _25:
-    ea = READ8(pc);
+    ea = READX8(pc);
     pc = (pc + 1);
     ac = (ac & READ8(ea));
     SET_NZ(ac);
     CYCLES(3);
     NEXT;
   _26:
-    ea = READ8(pc);
+    ea = READX8(pc);
     pc = (pc + 1);
     dt = READ8(ea);
     et = (dt & 0x80);
@@ -386,7 +385,7 @@ uint32_t s6502_exec(s6502_t *u, uint32_t cycles) {
     CYCLES(5);
     NEXT;
   _27:
-    ea = READ8(pc);
+    ea = READX8(pc);
     pc = (pc + 1);
     dt = READ8(ea);
     WRITE8(ea, (dt & ~(0x01 << 2)));
@@ -414,7 +413,7 @@ uint32_t s6502_exec(s6502_t *u, uint32_t cycles) {
     CYCLES(1);
     NEXT;
   _2c:
-    ea = READ16(pc);
+    ea = READX16(pc);
     pc = (pc + 2);
     dt = READ8(ea);
     SET_V((dt & 0x40));
@@ -423,14 +422,14 @@ uint32_t s6502_exec(s6502_t *u, uint32_t cycles) {
     CYCLES(4);
     NEXT;
   _2d:
-    ea = READ16(pc);
+    ea = READX16(pc);
     pc = (pc + 2);
     ac = (ac & READ8(ea));
     SET_NZ(ac);
     CYCLES(4);
     NEXT;
   _2e:
-    ea = READ16(pc);
+    ea = READX16(pc);
     pc = (pc + 2);
     dt = READ8(ea);
     et = (dt & 0x80);
@@ -441,11 +440,11 @@ uint32_t s6502_exec(s6502_t *u, uint32_t cycles) {
     CYCLES(6);
     NEXT;
   _2f:
-    ea = READ8(pc);
+    ea = READX8(pc);
     pc = (pc + 1);
     dt = READ8(ea);
     if (!(dt & (0x01 << 2))) {
-      ea = (pc + 1 + ((int8_t)(READ8(pc))));
+      ea = (pc + 1 + ((int8_t)(READX8(pc))));
       pc = (pc + 1);
       pc = ea;
     } else {
@@ -454,7 +453,7 @@ uint32_t s6502_exec(s6502_t *u, uint32_t cycles) {
     CYCLES(5);
     NEXT;
   _30:
-    ea = (pc + 1 + ((int8_t)(READ8(pc))));
+    ea = (pc + 1 + ((int8_t)(READX8(pc))));
     pc = (pc + 1);
     if (NEGATIVE_p) {
       CYCLES(1);
@@ -464,7 +463,7 @@ uint32_t s6502_exec(s6502_t *u, uint32_t cycles) {
     CYCLES(2);
     NEXT;
   _31:
-    et = READ16W((READ8(pc)));
+    et = READ16W((READX8(pc)));
     pc = (pc + 1);
     ea = (et + iy);
     CYCLES((!!(0xff00 & (et ^ ea))));
@@ -473,7 +472,7 @@ uint32_t s6502_exec(s6502_t *u, uint32_t cycles) {
     CYCLES(5);
     NEXT;
   _32:
-    ea = READ16W((READ8(pc)));
+    ea = READ16W((READX8(pc)));
     pc = (pc + 1);
     ac = (ac & READ8(ea));
     SET_NZ(ac);
@@ -483,7 +482,7 @@ uint32_t s6502_exec(s6502_t *u, uint32_t cycles) {
     CYCLES(1);
     NEXT;
   _34:
-    ea = ((ix + READ8(pc)) & 0xff);
+    ea = ((ix + READX8(pc)) & 0xff);
     pc = (pc + 1);
     dt = READ8(ea);
     SET_V((dt & 0x40));
@@ -492,14 +491,14 @@ uint32_t s6502_exec(s6502_t *u, uint32_t cycles) {
     CYCLES(4);
     NEXT;
   _35:
-    ea = ((ix + READ8(pc)) & 0xff);
+    ea = ((ix + READX8(pc)) & 0xff);
     pc = (pc + 1);
     ac = (ac & READ8(ea));
     SET_NZ(ac);
     CYCLES(4);
     NEXT;
   _36:
-    ea = ((ix + READ8(pc)) & 0xff);
+    ea = ((ix + READX8(pc)) & 0xff);
     pc = (pc + 1);
     dt = READ8(ea);
     et = (dt & 0x80);
@@ -510,7 +509,7 @@ uint32_t s6502_exec(s6502_t *u, uint32_t cycles) {
     CYCLES(6);
     NEXT;
   _37:
-    ea = READ8(pc);
+    ea = READX8(pc);
     pc = (pc + 1);
     dt = READ8(ea);
     WRITE8(ea, (dt & ~(0x01 << 3)));
@@ -521,7 +520,7 @@ uint32_t s6502_exec(s6502_t *u, uint32_t cycles) {
     CYCLES(2);
     NEXT;
   _39:
-    et = READ16(pc);
+    et = READX16(pc);
     ea = (et + iy);
     pc = (pc + 2);
     CYCLES((!!(0xff00 & (et ^ ea))));
@@ -538,7 +537,7 @@ uint32_t s6502_exec(s6502_t *u, uint32_t cycles) {
     CYCLES(1);
     NEXT;
   _3c:
-    et = READ16(pc);
+    et = READX16(pc);
     ea = (et + ix);
     pc = (pc + 2);
     dt = READ8(ea);
@@ -548,7 +547,7 @@ uint32_t s6502_exec(s6502_t *u, uint32_t cycles) {
     CYCLES(4);
     NEXT;
   _3d:
-    et = READ16(pc);
+    et = READX16(pc);
     ea = (et + ix);
     pc = (pc + 2);
     CYCLES((!!(0xff00 & (et ^ ea))));
@@ -557,7 +556,7 @@ uint32_t s6502_exec(s6502_t *u, uint32_t cycles) {
     CYCLES(4);
     NEXT;
   _3e:
-    et = READ16(pc);
+    et = READX16(pc);
     ea = (et + ix);
     pc = (pc + 2);
     CYCLES((!!(0xff00 & (et ^ ea))));
@@ -570,11 +569,11 @@ uint32_t s6502_exec(s6502_t *u, uint32_t cycles) {
     CYCLES(6);
     NEXT;
   _3f:
-    ea = READ8(pc);
+    ea = READX8(pc);
     pc = (pc + 1);
     dt = READ8(ea);
     if (!(dt & (0x01 << 3))) {
-      ea = (pc + 1 + ((int8_t)(READ8(pc))));
+      ea = (pc + 1 + ((int8_t)(READX8(pc))));
       pc = (pc + 1);
       pc = ea;
     } else {
@@ -589,7 +588,7 @@ uint32_t s6502_exec(s6502_t *u, uint32_t cycles) {
     CYCLES(6);
     EXIT;
   _41:
-    ea = READ16W((0xff & (READ8(pc) + ix)));
+    ea = READ16W((0xff & (READX8(pc) + ix)));
     pc = (pc + 1);
     dt = READ8(ea);
     ac = (ac ^ dt);
@@ -606,13 +605,13 @@ uint32_t s6502_exec(s6502_t *u, uint32_t cycles) {
     CYCLES(1);
     NEXT;
   _44:
-    ea = READ8(pc);
+    ea = READX8(pc);
     pc = (pc + 1);
     READ8(ea);
     CYCLES(3);
     NEXT;
   _45:
-    ea = READ8(pc);
+    ea = READX8(pc);
     pc = (pc + 1);
     dt = READ8(ea);
     ac = (ac ^ dt);
@@ -620,7 +619,7 @@ uint32_t s6502_exec(s6502_t *u, uint32_t cycles) {
     CYCLES(3);
     NEXT;
   _46:
-    ea = READ8(pc);
+    ea = READX8(pc);
     pc = (pc + 1);
     dt = READ8(ea);
     SET_C((0x01 & dt));
@@ -630,7 +629,7 @@ uint32_t s6502_exec(s6502_t *u, uint32_t cycles) {
     CYCLES(5);
     NEXT;
   _47:
-    ea = READ8(pc);
+    ea = READX8(pc);
     pc = (pc + 1);
     dt = READ8(ea);
     WRITE8(ea, (dt & ~(0x01 << 4)));
@@ -658,13 +657,13 @@ uint32_t s6502_exec(s6502_t *u, uint32_t cycles) {
     CYCLES(1);
     NEXT;
   _4c:
-    ea = READ16(pc);
+    ea = READX16(pc);
     pc = (pc + 2);
     pc = ea;
     CYCLES(3);
     EXIT;
   _4d:
-    ea = READ16(pc);
+    ea = READX16(pc);
     pc = (pc + 2);
     dt = READ8(ea);
     ac = (ac ^ dt);
@@ -672,7 +671,7 @@ uint32_t s6502_exec(s6502_t *u, uint32_t cycles) {
     CYCLES(4);
     NEXT;
   _4e:
-    ea = READ16(pc);
+    ea = READX16(pc);
     pc = (pc + 2);
     dt = READ8(ea);
     SET_C((0x01 & dt));
@@ -682,11 +681,11 @@ uint32_t s6502_exec(s6502_t *u, uint32_t cycles) {
     CYCLES(6);
     NEXT;
   _4f:
-    ea = READ8(pc);
+    ea = READX8(pc);
     pc = (pc + 1);
     dt = READ8(ea);
     if (!(dt & (0x01 << 4))) {
-      ea = (pc + 1 + ((int8_t)(READ8(pc))));
+      ea = (pc + 1 + ((int8_t)(READX8(pc))));
       pc = (pc + 1);
       pc = ea;
     } else {
@@ -695,7 +694,7 @@ uint32_t s6502_exec(s6502_t *u, uint32_t cycles) {
     CYCLES(5);
     NEXT;
   _50:
-    ea = (pc + 1 + ((int8_t)(READ8(pc))));
+    ea = (pc + 1 + ((int8_t)(READX8(pc))));
     pc = (pc + 1);
     if (!OVERFLOW_p) {
       CYCLES(1);
@@ -705,7 +704,7 @@ uint32_t s6502_exec(s6502_t *u, uint32_t cycles) {
     CYCLES(2);
     NEXT;
   _51:
-    et = READ16W((READ8(pc)));
+    et = READ16W((READX8(pc)));
     pc = (pc + 1);
     ea = (et + iy);
     CYCLES((!!(0xff00 & (et ^ ea))));
@@ -715,7 +714,7 @@ uint32_t s6502_exec(s6502_t *u, uint32_t cycles) {
     CYCLES(5);
     NEXT;
   _52:
-    ea = READ16W((READ8(pc)));
+    ea = READ16W((READX8(pc)));
     pc = (pc + 1);
     dt = READ8(ea);
     ac = (ac ^ dt);
@@ -726,13 +725,13 @@ uint32_t s6502_exec(s6502_t *u, uint32_t cycles) {
     CYCLES(1);
     NEXT;
   _54:
-    ea = ((ix + READ8(pc)) & 0xff);
+    ea = ((ix + READX8(pc)) & 0xff);
     pc = (pc + 1);
     READ8(ea);
     CYCLES(4);
     NEXT;
   _55:
-    ea = ((ix + READ8(pc)) & 0xff);
+    ea = ((ix + READX8(pc)) & 0xff);
     pc = (pc + 1);
     dt = READ8(ea);
     ac = (ac ^ dt);
@@ -740,7 +739,7 @@ uint32_t s6502_exec(s6502_t *u, uint32_t cycles) {
     CYCLES(4);
     NEXT;
   _56:
-    ea = ((ix + READ8(pc)) & 0xff);
+    ea = ((ix + READX8(pc)) & 0xff);
     pc = (pc + 1);
     dt = READ8(ea);
     SET_C((0x01 & dt));
@@ -750,7 +749,7 @@ uint32_t s6502_exec(s6502_t *u, uint32_t cycles) {
     CYCLES(6);
     NEXT;
   _57:
-    ea = READ8(pc);
+    ea = READX8(pc);
     pc = (pc + 1);
     dt = READ8(ea);
     WRITE8(ea, (dt & ~(0x01 << 5)));
@@ -761,7 +760,7 @@ uint32_t s6502_exec(s6502_t *u, uint32_t cycles) {
     CYCLES(2);
     NEXT;
   _59:
-    et = READ16(pc);
+    et = READX16(pc);
     ea = (et + iy);
     pc = (pc + 2);
     CYCLES((!!(0xff00 & (et ^ ea))));
@@ -778,13 +777,13 @@ uint32_t s6502_exec(s6502_t *u, uint32_t cycles) {
     CYCLES(1);
     NEXT;
   _5c:
-    ea = READ16(pc);
+    ea = READX16(pc);
     pc = (pc + 2);
     READ8(ea);
     CYCLES(8);
     NEXT;
   _5d:
-    et = READ16(pc);
+    et = READX16(pc);
     ea = (et + ix);
     pc = (pc + 2);
     CYCLES((!!(0xff00 & (et ^ ea))));
@@ -794,7 +793,7 @@ uint32_t s6502_exec(s6502_t *u, uint32_t cycles) {
     CYCLES(4);
     NEXT;
   _5e:
-    et = READ16(pc);
+    et = READX16(pc);
     ea = (et + ix);
     pc = (pc + 2);
     CYCLES((!!(0xff00 & (et ^ ea))));
@@ -806,11 +805,11 @@ uint32_t s6502_exec(s6502_t *u, uint32_t cycles) {
     CYCLES(6);
     NEXT;
   _5f:
-    ea = READ8(pc);
+    ea = READX8(pc);
     pc = (pc + 1);
     dt = READ8(ea);
     if (!(dt & (0x01 << 5))) {
-      ea = (pc + 1 + ((int8_t)(READ8(pc))));
+      ea = (pc + 1 + ((int8_t)(READX8(pc))));
       pc = (pc + 1);
       pc = ea;
     } else {
@@ -825,7 +824,7 @@ uint32_t s6502_exec(s6502_t *u, uint32_t cycles) {
     CYCLES(6);
     EXIT;
   _61:
-    ea = READ16W((0xff & (READ8(pc) + ix)));
+    ea = READ16W((0xff & (READX8(pc) + ix)));
     pc = (pc + 1);
     if (DECIMAL_p) {
       CYCLES(1);
@@ -878,13 +877,13 @@ uint32_t s6502_exec(s6502_t *u, uint32_t cycles) {
     CYCLES(1);
     NEXT;
   _64:
-    ea = READ8(pc);
+    ea = READX8(pc);
     pc = (pc + 1);
     WRITE8(ea, 0);
     CYCLES(3);
     NEXT;
   _65:
-    ea = READ8(pc);
+    ea = READX8(pc);
     pc = (pc + 1);
     if (DECIMAL_p) {
       CYCLES(1);
@@ -928,7 +927,7 @@ uint32_t s6502_exec(s6502_t *u, uint32_t cycles) {
     CYCLES(3);
     NEXT;
   _66:
-    ea = READ8(pc);
+    ea = READX8(pc);
     pc = (pc + 1);
     dt = READ8(ea);
     et = (dt & 0x01);
@@ -939,7 +938,7 @@ uint32_t s6502_exec(s6502_t *u, uint32_t cycles) {
     CYCLES(5);
     NEXT;
   _67:
-    ea = READ8(pc);
+    ea = READX8(pc);
     pc = (pc + 1);
     dt = READ8(ea);
     WRITE8(ea, (dt & ~(0x01 << 6)));
@@ -1004,13 +1003,13 @@ uint32_t s6502_exec(s6502_t *u, uint32_t cycles) {
     CYCLES(1);
     NEXT;
   _6c:
-    ea = READ16((READ16(pc)));
+    ea = READ16((READX16(pc)));
     pc = (pc + 1);
     pc = ea;
     CYCLES(6);
     NEXT;
   _6d:
-    ea = READ16(pc);
+    ea = READX16(pc);
     pc = (pc + 2);
     if (DECIMAL_p) {
       CYCLES(1);
@@ -1054,7 +1053,7 @@ uint32_t s6502_exec(s6502_t *u, uint32_t cycles) {
     CYCLES(4);
     NEXT;
   _6e:
-    ea = READ16(pc);
+    ea = READX16(pc);
     pc = (pc + 2);
     dt = READ8(ea);
     et = (dt & 0x01);
@@ -1065,11 +1064,11 @@ uint32_t s6502_exec(s6502_t *u, uint32_t cycles) {
     CYCLES(6);
     NEXT;
   _6f:
-    ea = READ8(pc);
+    ea = READX8(pc);
     pc = (pc + 1);
     dt = READ8(ea);
     if (!(dt & (0x01 << 6))) {
-      ea = (pc + 1 + ((int8_t)(READ8(pc))));
+      ea = (pc + 1 + ((int8_t)(READX8(pc))));
       pc = (pc + 1);
       pc = ea;
     } else {
@@ -1078,7 +1077,7 @@ uint32_t s6502_exec(s6502_t *u, uint32_t cycles) {
     CYCLES(5);
     NEXT;
   _70:
-    ea = (pc + 1 + ((int8_t)(READ8(pc))));
+    ea = (pc + 1 + ((int8_t)(READX8(pc))));
     pc = (pc + 1);
     if (OVERFLOW_p) {
       CYCLES(1);
@@ -1088,7 +1087,7 @@ uint32_t s6502_exec(s6502_t *u, uint32_t cycles) {
     CYCLES(2);
     NEXT;
   _71:
-    et = READ16W((READ8(pc)));
+    et = READ16W((READX8(pc)));
     pc = (pc + 1);
     ea = (et + iy);
     CYCLES((!!(0xff00 & (et ^ ea))));
@@ -1134,7 +1133,7 @@ uint32_t s6502_exec(s6502_t *u, uint32_t cycles) {
     CYCLES(5);
     NEXT;
   _72:
-    ea = READ16W((READ8(pc)));
+    ea = READ16W((READX8(pc)));
     pc = (pc + 1);
     if (DECIMAL_p) {
       CYCLES(1);
@@ -1181,13 +1180,13 @@ uint32_t s6502_exec(s6502_t *u, uint32_t cycles) {
     CYCLES(1);
     NEXT;
   _74:
-    ea = ((ix + READ8(pc)) & 0xff);
+    ea = ((ix + READX8(pc)) & 0xff);
     pc = (pc + 1);
     WRITE8(ea, 0);
     CYCLES(4);
     NEXT;
   _75:
-    ea = ((ix + READ8(pc)) & 0xff);
+    ea = ((ix + READX8(pc)) & 0xff);
     pc = (pc + 1);
     if (DECIMAL_p) {
       CYCLES(1);
@@ -1231,7 +1230,7 @@ uint32_t s6502_exec(s6502_t *u, uint32_t cycles) {
     CYCLES(4);
     NEXT;
   _76:
-    ea = ((ix + READ8(pc)) & 0xff);
+    ea = ((ix + READX8(pc)) & 0xff);
     pc = (pc + 1);
     dt = READ8(ea);
     et = (dt & 0x01);
@@ -1242,7 +1241,7 @@ uint32_t s6502_exec(s6502_t *u, uint32_t cycles) {
     CYCLES(6);
     NEXT;
   _77:
-    ea = READ8(pc);
+    ea = READX8(pc);
     pc = (pc + 1);
     dt = READ8(ea);
     WRITE8(ea, (dt & ~(0x01 << 7)));
@@ -1253,7 +1252,7 @@ uint32_t s6502_exec(s6502_t *u, uint32_t cycles) {
     CYCLES(2);
     NEXT;
   _79:
-    et = READ16(pc);
+    et = READX16(pc);
     ea = (et + iy);
     pc = (pc + 2);
     CYCLES((!!(0xff00 & (et ^ ea))));
@@ -1307,13 +1306,13 @@ uint32_t s6502_exec(s6502_t *u, uint32_t cycles) {
     CYCLES(1);
     NEXT;
   _7c:
-    ea = READ16((READ16(pc) + ix));
+    ea = READ16((READX16(pc) + ix));
     pc = (pc + 1);
     pc = ea;
     CYCLES(6);
     NEXT;
   _7d:
-    et = READ16(pc);
+    et = READX16(pc);
     ea = (et + ix);
     pc = (pc + 2);
     CYCLES((!!(0xff00 & (et ^ ea))));
@@ -1359,7 +1358,7 @@ uint32_t s6502_exec(s6502_t *u, uint32_t cycles) {
     CYCLES(4);
     NEXT;
   _7e:
-    et = READ16(pc);
+    et = READX16(pc);
     ea = (et + ix);
     pc = (pc + 2);
     CYCLES((!!(0xff00 & (et ^ ea))));
@@ -1372,11 +1371,11 @@ uint32_t s6502_exec(s6502_t *u, uint32_t cycles) {
     CYCLES(6);
     NEXT;
   _7f:
-    ea = READ8(pc);
+    ea = READX8(pc);
     pc = (pc + 1);
     dt = READ8(ea);
     if (!(dt & (0x01 << 7))) {
-      ea = (pc + 1 + ((int8_t)(READ8(pc))));
+      ea = (pc + 1 + ((int8_t)(READX8(pc))));
       pc = (pc + 1);
       pc = ea;
     } else {
@@ -1385,7 +1384,7 @@ uint32_t s6502_exec(s6502_t *u, uint32_t cycles) {
     CYCLES(5);
     NEXT;
   _80:
-    ea = (pc + 1 + ((int8_t)(READ8(pc))));
+    ea = (pc + 1 + ((int8_t)(READX8(pc))));
     pc = (pc + 1);
     CYCLES(1);
     CYCLES((!!(0xff00 & (pc ^ ea))));
@@ -1393,7 +1392,7 @@ uint32_t s6502_exec(s6502_t *u, uint32_t cycles) {
     CYCLES(2);
     NEXT;
   _81:
-    ea = READ16W((0xff & (READ8(pc) + ix)));
+    ea = READ16W((0xff & (READX8(pc) + ix)));
     pc = (pc + 1);
     WRITE8(ea, ac);
     CYCLES(6);
@@ -1408,25 +1407,25 @@ uint32_t s6502_exec(s6502_t *u, uint32_t cycles) {
     CYCLES(1);
     NEXT;
   _84:
-    ea = READ8(pc);
+    ea = READX8(pc);
     pc = (pc + 1);
     WRITE8(ea, iy);
     CYCLES(3);
     NEXT;
   _85:
-    ea = READ8(pc);
+    ea = READX8(pc);
     pc = (pc + 1);
     WRITE8(ea, ac);
     CYCLES(3);
     NEXT;
   _86:
-    ea = READ8(pc);
+    ea = READX8(pc);
     pc = (pc + 1);
     WRITE8(ea, ix);
     CYCLES(3);
     NEXT;
   _87:
-    ea = READ8(pc);
+    ea = READX8(pc);
     pc = (pc + 1);
     dt = READ8(ea);
     WRITE8(ea, (dt | (0x01 << 0)));
@@ -1452,29 +1451,29 @@ uint32_t s6502_exec(s6502_t *u, uint32_t cycles) {
     CYCLES(1);
     NEXT;
   _8c:
-    ea = READ16(pc);
+    ea = READX16(pc);
     pc = (pc + 2);
     WRITE8(ea, iy);
     CYCLES(4);
     NEXT;
   _8d:
-    ea = READ16(pc);
+    ea = READX16(pc);
     pc = (pc + 2);
     WRITE8(ea, ac);
     CYCLES(4);
     NEXT;
   _8e:
-    ea = READ16(pc);
+    ea = READX16(pc);
     pc = (pc + 2);
     WRITE8(ea, ix);
     CYCLES(4);
     NEXT;
   _8f:
-    ea = READ8(pc);
+    ea = READX8(pc);
     pc = (pc + 1);
     dt = READ8(ea);
     if (dt & (0x01 << 0)) {
-      ea = (pc + 1 + ((int8_t)(READ8(pc))));
+      ea = (pc + 1 + ((int8_t)(READX8(pc))));
       pc = (pc + 1);
       pc = ea;
     } else {
@@ -1483,7 +1482,7 @@ uint32_t s6502_exec(s6502_t *u, uint32_t cycles) {
     CYCLES(5);
     NEXT;
   _90:
-    ea = (pc + 1 + ((int8_t)(READ8(pc))));
+    ea = (pc + 1 + ((int8_t)(READX8(pc))));
     pc = (pc + 1);
     if (!CARRY_p) {
       CYCLES(1);
@@ -1493,14 +1492,14 @@ uint32_t s6502_exec(s6502_t *u, uint32_t cycles) {
     CYCLES(2);
     NEXT;
   _91:
-    et = READ16W((READ8(pc)));
+    et = READ16W((READX8(pc)));
     pc = (pc + 1);
     ea = (et + iy);
     WRITE8(ea, ac);
     CYCLES(6);
     NEXT;
   _92:
-    ea = READ16W((READ8(pc)));
+    ea = READ16W((READX8(pc)));
     pc = (pc + 1);
     WRITE8(ea, ac);
     CYCLES(5);
@@ -1509,25 +1508,25 @@ uint32_t s6502_exec(s6502_t *u, uint32_t cycles) {
     CYCLES(1);
     NEXT;
   _94:
-    ea = ((ix + READ8(pc)) & 0xff);
+    ea = ((ix + READX8(pc)) & 0xff);
     pc = (pc + 1);
     WRITE8(ea, iy);
     CYCLES(4);
     NEXT;
   _95:
-    ea = ((ix + READ8(pc)) & 0xff);
+    ea = ((ix + READX8(pc)) & 0xff);
     pc = (pc + 1);
     WRITE8(ea, ac);
     CYCLES(4);
     NEXT;
   _96:
-    ea = ((iy + READ8(pc)) & 0xff);
+    ea = ((iy + READX8(pc)) & 0xff);
     pc = (pc + 1);
     WRITE8(ea, ix);
     CYCLES(4);
     NEXT;
   _97:
-    ea = READ8(pc);
+    ea = READX8(pc);
     pc = (pc + 1);
     dt = READ8(ea);
     WRITE8(ea, (dt | (0x01 << 1)));
@@ -1538,7 +1537,7 @@ uint32_t s6502_exec(s6502_t *u, uint32_t cycles) {
     CYCLES(2);
     NEXT;
   _99:
-    et = READ16(pc);
+    et = READX16(pc);
     ea = (et + iy);
     pc = (pc + 2);
     WRITE8(ea, ac);
@@ -1552,31 +1551,31 @@ uint32_t s6502_exec(s6502_t *u, uint32_t cycles) {
     CYCLES(1);
     NEXT;
   _9c:
-    ea = READ16(pc);
+    ea = READX16(pc);
     pc = (pc + 2);
     WRITE8(ea, 0);
     CYCLES(4);
     NEXT;
   _9d:
-    et = READ16(pc);
+    et = READX16(pc);
     ea = (et + ix);
     pc = (pc + 2);
     WRITE8(ea, ac);
     CYCLES(5);
     NEXT;
   _9e:
-    et = READ16(pc);
+    et = READX16(pc);
     ea = (et + ix);
     pc = (pc + 2);
     WRITE8(ea, 0);
     CYCLES(5);
     NEXT;
   _9f:
-    ea = READ8(pc);
+    ea = READX8(pc);
     pc = (pc + 1);
     dt = READ8(ea);
     if (dt & (0x01 << 1)) {
-      ea = (pc + 1 + ((int8_t)(READ8(pc))));
+      ea = (pc + 1 + ((int8_t)(READX8(pc))));
       pc = (pc + 1);
       pc = ea;
     } else {
@@ -1592,7 +1591,7 @@ uint32_t s6502_exec(s6502_t *u, uint32_t cycles) {
     CYCLES(2);
     NEXT;
   _a1:
-    ea = READ16W((0xff & (READ8(pc) + ix)));
+    ea = READ16W((0xff & (READX8(pc) + ix)));
     pc = (pc + 1);
     ac = READ8(ea);
     SET_NZ(ac);
@@ -1609,28 +1608,28 @@ uint32_t s6502_exec(s6502_t *u, uint32_t cycles) {
     CYCLES(1);
     NEXT;
   _a4:
-    ea = READ8(pc);
+    ea = READX8(pc);
     pc = (pc + 1);
     iy = READ8(ea);
     SET_NZ(iy);
     CYCLES(3);
     NEXT;
   _a5:
-    ea = READ8(pc);
+    ea = READX8(pc);
     pc = (pc + 1);
     ac = READ8(ea);
     SET_NZ(ac);
     CYCLES(3);
     NEXT;
   _a6:
-    ea = READ8(pc);
+    ea = READX8(pc);
     pc = (pc + 1);
     ix = READ8(ea);
     SET_NZ(ix);
     CYCLES(3);
     NEXT;
   _a7:
-    ea = READ8(pc);
+    ea = READX8(pc);
     pc = (pc + 1);
     dt = READ8(ea);
     WRITE8(ea, (dt | (0x01 << 2)));
@@ -1655,32 +1654,32 @@ uint32_t s6502_exec(s6502_t *u, uint32_t cycles) {
     CYCLES(1);
     NEXT;
   _ac:
-    ea = READ16(pc);
+    ea = READX16(pc);
     pc = (pc + 2);
     iy = READ8(ea);
     SET_NZ(iy);
     CYCLES(4);
     NEXT;
   _ad:
-    ea = READ16(pc);
+    ea = READX16(pc);
     pc = (pc + 2);
     ac = READ8(ea);
     SET_NZ(ac);
     CYCLES(4);
     NEXT;
   _ae:
-    ea = READ16(pc);
+    ea = READX16(pc);
     pc = (pc + 2);
     ix = READ8(ea);
     SET_NZ(ix);
     CYCLES(4);
     NEXT;
   _af:
-    ea = READ8(pc);
+    ea = READX8(pc);
     pc = (pc + 1);
     dt = READ8(ea);
     if (dt & (0x01 << 2)) {
-      ea = (pc + 1 + ((int8_t)(READ8(pc))));
+      ea = (pc + 1 + ((int8_t)(READX8(pc))));
       pc = (pc + 1);
       pc = ea;
     } else {
@@ -1689,7 +1688,7 @@ uint32_t s6502_exec(s6502_t *u, uint32_t cycles) {
     CYCLES(5);
     NEXT;
   _b0:
-    ea = (pc + 1 + ((int8_t)(READ8(pc))));
+    ea = (pc + 1 + ((int8_t)(READX8(pc))));
     pc = (pc + 1);
     if (CARRY_p) {
       CYCLES(1);
@@ -1699,7 +1698,7 @@ uint32_t s6502_exec(s6502_t *u, uint32_t cycles) {
     CYCLES(2);
     NEXT;
   _b1:
-    et = READ16W((READ8(pc)));
+    et = READ16W((READX8(pc)));
     pc = (pc + 1);
     ea = (et + iy);
     CYCLES((!!(0xff00 & (et ^ ea))));
@@ -1708,7 +1707,7 @@ uint32_t s6502_exec(s6502_t *u, uint32_t cycles) {
     CYCLES(5);
     NEXT;
   _b2:
-    ea = READ16W((READ8(pc)));
+    ea = READ16W((READX8(pc)));
     pc = (pc + 1);
     ac = READ8(ea);
     SET_NZ(ac);
@@ -1718,28 +1717,28 @@ uint32_t s6502_exec(s6502_t *u, uint32_t cycles) {
     CYCLES(1);
     NEXT;
   _b4:
-    ea = ((ix + READ8(pc)) & 0xff);
+    ea = ((ix + READX8(pc)) & 0xff);
     pc = (pc + 1);
     iy = READ8(ea);
     SET_NZ(iy);
     CYCLES(4);
     NEXT;
   _b5:
-    ea = ((ix + READ8(pc)) & 0xff);
+    ea = ((ix + READX8(pc)) & 0xff);
     pc = (pc + 1);
     ac = READ8(ea);
     SET_NZ(ac);
     CYCLES(4);
     NEXT;
   _b6:
-    ea = ((iy + READ8(pc)) & 0xff);
+    ea = ((iy + READX8(pc)) & 0xff);
     pc = (pc + 1);
     ix = READ8(ea);
     SET_NZ(ix);
     CYCLES(4);
     NEXT;
   _b7:
-    ea = READ8(pc);
+    ea = READX8(pc);
     pc = (pc + 1);
     dt = READ8(ea);
     WRITE8(ea, (dt | (0x01 << 3)));
@@ -1750,7 +1749,7 @@ uint32_t s6502_exec(s6502_t *u, uint32_t cycles) {
     CYCLES(2);
     NEXT;
   _b9:
-    et = READ16(pc);
+    et = READX16(pc);
     ea = (et + iy);
     pc = (pc + 2);
     CYCLES((!!(0xff00 & (et ^ ea))));
@@ -1766,7 +1765,7 @@ uint32_t s6502_exec(s6502_t *u, uint32_t cycles) {
     CYCLES(1);
     NEXT;
   _bc:
-    et = READ16(pc);
+    et = READX16(pc);
     ea = (et + ix);
     pc = (pc + 2);
     CYCLES((!!(0xff00 & (et ^ ea))));
@@ -1775,7 +1774,7 @@ uint32_t s6502_exec(s6502_t *u, uint32_t cycles) {
     CYCLES(4);
     NEXT;
   _bd:
-    et = READ16(pc);
+    et = READX16(pc);
     ea = (et + ix);
     pc = (pc + 2);
     CYCLES((!!(0xff00 & (et ^ ea))));
@@ -1784,7 +1783,7 @@ uint32_t s6502_exec(s6502_t *u, uint32_t cycles) {
     CYCLES(4);
     NEXT;
   _be:
-    et = READ16(pc);
+    et = READX16(pc);
     ea = (et + iy);
     pc = (pc + 2);
     CYCLES((!!(0xff00 & (et ^ ea))));
@@ -1793,11 +1792,11 @@ uint32_t s6502_exec(s6502_t *u, uint32_t cycles) {
     CYCLES(4);
     NEXT;
   _bf:
-    ea = READ8(pc);
+    ea = READX8(pc);
     pc = (pc + 1);
     dt = READ8(ea);
     if (dt & (0x01 << 3)) {
-      ea = (pc + 1 + ((int8_t)(READ8(pc))));
+      ea = (pc + 1 + ((int8_t)(READX8(pc))));
       pc = (pc + 1);
       pc = ea;
     } else {
@@ -1815,7 +1814,7 @@ uint32_t s6502_exec(s6502_t *u, uint32_t cycles) {
     CYCLES(2);
     NEXT;
   _c1:
-    ea = READ16W((0xff & (READ8(pc) + ix)));
+    ea = READ16W((0xff & (READX8(pc) + ix)));
     pc = (pc + 1);
     dt = ~READ8(ea);
     et = (ac + dt + 1);
@@ -1833,7 +1832,7 @@ uint32_t s6502_exec(s6502_t *u, uint32_t cycles) {
     CYCLES(1);
     NEXT;
   _c4:
-    ea = READ8(pc);
+    ea = READX8(pc);
     pc = (pc + 1);
     dt = ~READ8(ea);
     et = (iy + dt + 1);
@@ -1842,7 +1841,7 @@ uint32_t s6502_exec(s6502_t *u, uint32_t cycles) {
     CYCLES(3);
     NEXT;
   _c5:
-    ea = READ8(pc);
+    ea = READX8(pc);
     pc = (pc + 1);
     dt = ~READ8(ea);
     et = (ac + dt + 1);
@@ -1851,7 +1850,7 @@ uint32_t s6502_exec(s6502_t *u, uint32_t cycles) {
     CYCLES(3);
     NEXT;
   _c6:
-    ea = READ8(pc);
+    ea = READX8(pc);
     pc = (pc + 1);
     dt = (READ8(ea) - 1);
     SET_NZ(dt);
@@ -1859,7 +1858,7 @@ uint32_t s6502_exec(s6502_t *u, uint32_t cycles) {
     CYCLES(5);
     NEXT;
   _c7:
-    ea = READ8(pc);
+    ea = READX8(pc);
     pc = (pc + 1);
     dt = READ8(ea);
     WRITE8(ea, (dt | (0x01 << 4)));
@@ -1888,7 +1887,7 @@ uint32_t s6502_exec(s6502_t *u, uint32_t cycles) {
     CYCLES(3);
     NEXT;
   _cc:
-    ea = READ16(pc);
+    ea = READX16(pc);
     pc = (pc + 2);
     dt = ~READ8(ea);
     et = (iy + dt + 1);
@@ -1897,7 +1896,7 @@ uint32_t s6502_exec(s6502_t *u, uint32_t cycles) {
     CYCLES(4);
     NEXT;
   _cd:
-    ea = READ16(pc);
+    ea = READX16(pc);
     pc = (pc + 2);
     dt = ~READ8(ea);
     et = (ac + dt + 1);
@@ -1906,7 +1905,7 @@ uint32_t s6502_exec(s6502_t *u, uint32_t cycles) {
     CYCLES(4);
     NEXT;
   _ce:
-    ea = READ16(pc);
+    ea = READX16(pc);
     pc = (pc + 2);
     dt = (READ8(ea) - 1);
     SET_NZ(dt);
@@ -1914,11 +1913,11 @@ uint32_t s6502_exec(s6502_t *u, uint32_t cycles) {
     CYCLES(6);
     NEXT;
   _cf:
-    ea = READ8(pc);
+    ea = READX8(pc);
     pc = (pc + 1);
     dt = READ8(ea);
     if (dt & (0x01 << 4)) {
-      ea = (pc + 1 + ((int8_t)(READ8(pc))));
+      ea = (pc + 1 + ((int8_t)(READX8(pc))));
       pc = (pc + 1);
       pc = ea;
     } else {
@@ -1927,7 +1926,7 @@ uint32_t s6502_exec(s6502_t *u, uint32_t cycles) {
     CYCLES(5);
     NEXT;
   _d0:
-    ea = (pc + 1 + ((int8_t)(READ8(pc))));
+    ea = (pc + 1 + ((int8_t)(READX8(pc))));
     pc = (pc + 1);
     if (!ZERO_p) {
       CYCLES(1);
@@ -1937,7 +1936,7 @@ uint32_t s6502_exec(s6502_t *u, uint32_t cycles) {
     CYCLES(2);
     NEXT;
   _d1:
-    et = READ16W((READ8(pc)));
+    et = READ16W((READX8(pc)));
     pc = (pc + 1);
     ea = (et + iy);
     CYCLES((!!(0xff00 & (et ^ ea))));
@@ -1948,7 +1947,7 @@ uint32_t s6502_exec(s6502_t *u, uint32_t cycles) {
     CYCLES(5);
     NEXT;
   _d2:
-    ea = READ16W((READ8(pc)));
+    ea = READ16W((READX8(pc)));
     pc = (pc + 1);
     dt = ~READ8(ea);
     et = (ac + dt + 1);
@@ -1960,13 +1959,13 @@ uint32_t s6502_exec(s6502_t *u, uint32_t cycles) {
     CYCLES(1);
     NEXT;
   _d4:
-    ea = ((ix + READ8(pc)) & 0xff);
+    ea = ((ix + READX8(pc)) & 0xff);
     pc = (pc + 1);
     READ8(ea);
     CYCLES(4);
     NEXT;
   _d5:
-    ea = ((ix + READ8(pc)) & 0xff);
+    ea = ((ix + READX8(pc)) & 0xff);
     pc = (pc + 1);
     dt = ~READ8(ea);
     et = (ac + dt + 1);
@@ -1975,7 +1974,7 @@ uint32_t s6502_exec(s6502_t *u, uint32_t cycles) {
     CYCLES(4);
     NEXT;
   _d6:
-    ea = ((ix + READ8(pc)) & 0xff);
+    ea = ((ix + READX8(pc)) & 0xff);
     pc = (pc + 1);
     dt = (READ8(ea) - 1);
     SET_NZ(dt);
@@ -1983,7 +1982,7 @@ uint32_t s6502_exec(s6502_t *u, uint32_t cycles) {
     CYCLES(6);
     NEXT;
   _d7:
-    ea = READ8(pc);
+    ea = READX8(pc);
     pc = (pc + 1);
     dt = READ8(ea);
     WRITE8(ea, (dt | (0x01 << 5)));
@@ -1994,7 +1993,7 @@ uint32_t s6502_exec(s6502_t *u, uint32_t cycles) {
     CYCLES(2);
     NEXT;
   _d9:
-    et = READ16(pc);
+    et = READX16(pc);
     ea = (et + iy);
     pc = (pc + 2);
     CYCLES((!!(0xff00 & (et ^ ea))));
@@ -2012,13 +2011,13 @@ uint32_t s6502_exec(s6502_t *u, uint32_t cycles) {
     CYCLES(3);
     NEXT;
   _dc:
-    ea = READ16(pc);
+    ea = READX16(pc);
     pc = (pc + 2);
     READ8(ea);
     CYCLES(4);
     NEXT;
   _dd:
-    et = READ16(pc);
+    et = READX16(pc);
     ea = (et + ix);
     pc = (pc + 2);
     CYCLES((!!(0xff00 & (et ^ ea))));
@@ -2029,7 +2028,7 @@ uint32_t s6502_exec(s6502_t *u, uint32_t cycles) {
     CYCLES(4);
     NEXT;
   _de:
-    et = READ16(pc);
+    et = READX16(pc);
     ea = (et + ix);
     pc = (pc + 2);
     dt = (READ8(ea) - 1);
@@ -2038,11 +2037,11 @@ uint32_t s6502_exec(s6502_t *u, uint32_t cycles) {
     CYCLES(7);
     NEXT;
   _df:
-    ea = READ8(pc);
+    ea = READX8(pc);
     pc = (pc + 1);
     dt = READ8(ea);
     if (dt & (0x01 << 5)) {
-      ea = (pc + 1 + ((int8_t)(READ8(pc))));
+      ea = (pc + 1 + ((int8_t)(READX8(pc))));
       pc = (pc + 1);
       pc = ea;
     } else {
@@ -2060,7 +2059,7 @@ uint32_t s6502_exec(s6502_t *u, uint32_t cycles) {
     CYCLES(2);
     NEXT;
   _e1:
-    ea = READ16W((0xff & (READ8(pc) + ix)));
+    ea = READ16W((0xff & (READX8(pc) + ix)));
     pc = (pc + 1);
     if (DECIMAL_p) {
       CYCLES(1);
@@ -2097,7 +2096,7 @@ uint32_t s6502_exec(s6502_t *u, uint32_t cycles) {
     CYCLES(1);
     NEXT;
   _e4:
-    ea = READ8(pc);
+    ea = READX8(pc);
     pc = (pc + 1);
     dt = ~READ8(ea);
     et = (ix + dt + 1);
@@ -2106,7 +2105,7 @@ uint32_t s6502_exec(s6502_t *u, uint32_t cycles) {
     CYCLES(3);
     NEXT;
   _e5:
-    ea = READ8(pc);
+    ea = READX8(pc);
     pc = (pc + 1);
     if (DECIMAL_p) {
       CYCLES(1);
@@ -2134,7 +2133,7 @@ uint32_t s6502_exec(s6502_t *u, uint32_t cycles) {
     CYCLES(3);
     NEXT;
   _e6:
-    ea = READ8(pc);
+    ea = READX8(pc);
     pc = (pc + 1);
     dt = (READ8(ea) + 1);
     SET_NZ(dt);
@@ -2142,7 +2141,7 @@ uint32_t s6502_exec(s6502_t *u, uint32_t cycles) {
     CYCLES(5);
     NEXT;
   _e7:
-    ea = READ8(pc);
+    ea = READX8(pc);
     pc = (pc + 1);
     dt = READ8(ea);
     WRITE8(ea, (dt | (0x01 << 6)));
@@ -2188,7 +2187,7 @@ uint32_t s6502_exec(s6502_t *u, uint32_t cycles) {
     CYCLES(1);
     NEXT;
   _ec:
-    ea = READ16(pc);
+    ea = READX16(pc);
     pc = (pc + 2);
     dt = ~READ8(ea);
     et = (ix + dt + 1);
@@ -2197,7 +2196,7 @@ uint32_t s6502_exec(s6502_t *u, uint32_t cycles) {
     CYCLES(4);
     NEXT;
   _ed:
-    ea = READ16(pc);
+    ea = READX16(pc);
     pc = (pc + 2);
     if (DECIMAL_p) {
       CYCLES(1);
@@ -2225,7 +2224,7 @@ uint32_t s6502_exec(s6502_t *u, uint32_t cycles) {
     CYCLES(4);
     NEXT;
   _ee:
-    ea = READ16(pc);
+    ea = READX16(pc);
     pc = (pc + 2);
     dt = (READ8(ea) + 1);
     SET_NZ(dt);
@@ -2233,11 +2232,11 @@ uint32_t s6502_exec(s6502_t *u, uint32_t cycles) {
     CYCLES(6);
     NEXT;
   _ef:
-    ea = READ8(pc);
+    ea = READX8(pc);
     pc = (pc + 1);
     dt = READ8(ea);
     if (dt & (0x01 << 6)) {
-      ea = (pc + 1 + ((int8_t)(READ8(pc))));
+      ea = (pc + 1 + ((int8_t)(READX8(pc))));
       pc = (pc + 1);
       pc = ea;
     } else {
@@ -2246,7 +2245,7 @@ uint32_t s6502_exec(s6502_t *u, uint32_t cycles) {
     CYCLES(5);
     NEXT;
   _f0:
-    ea = (pc + 1 + ((int8_t)(READ8(pc))));
+    ea = (pc + 1 + ((int8_t)(READX8(pc))));
     pc = (pc + 1);
     if (ZERO_p) {
       CYCLES(1);
@@ -2256,7 +2255,7 @@ uint32_t s6502_exec(s6502_t *u, uint32_t cycles) {
     CYCLES(2);
     NEXT;
   _f1:
-    et = READ16W((READ8(pc)));
+    et = READ16W((READX8(pc)));
     pc = (pc + 1);
     ea = (et + iy);
     CYCLES((!!(0xff00 & (et ^ ea))));
@@ -2286,7 +2285,7 @@ uint32_t s6502_exec(s6502_t *u, uint32_t cycles) {
     CYCLES(5);
     NEXT;
   _f2:
-    ea = READ16W((READ8(pc)));
+    ea = READ16W((READX8(pc)));
     pc = (pc + 1);
     if (DECIMAL_p) {
       CYCLES(1);
@@ -2317,13 +2316,13 @@ uint32_t s6502_exec(s6502_t *u, uint32_t cycles) {
     CYCLES(1);
     NEXT;
   _f4:
-    ea = ((ix + READ8(pc)) & 0xff);
+    ea = ((ix + READX8(pc)) & 0xff);
     pc = (pc + 1);
     READ8(ea);
     CYCLES(4);
     NEXT;
   _f5:
-    ea = ((ix + READ8(pc)) & 0xff);
+    ea = ((ix + READX8(pc)) & 0xff);
     pc = (pc + 1);
     if (DECIMAL_p) {
       CYCLES(1);
@@ -2351,7 +2350,7 @@ uint32_t s6502_exec(s6502_t *u, uint32_t cycles) {
     CYCLES(4);
     NEXT;
   _f6:
-    ea = ((ix + READ8(pc)) & 0xff);
+    ea = ((ix + READX8(pc)) & 0xff);
     pc = (pc + 1);
     dt = (READ8(ea) + 1);
     SET_NZ(dt);
@@ -2359,7 +2358,7 @@ uint32_t s6502_exec(s6502_t *u, uint32_t cycles) {
     CYCLES(6);
     NEXT;
   _f7:
-    ea = READ8(pc);
+    ea = READX8(pc);
     pc = (pc + 1);
     dt = READ8(ea);
     WRITE8(ea, (dt | (0x01 << 7)));
@@ -2370,7 +2369,7 @@ uint32_t s6502_exec(s6502_t *u, uint32_t cycles) {
     CYCLES(2);
     NEXT;
   _f9:
-    et = READ16(pc);
+    et = READX16(pc);
     ea = (et + iy);
     pc = (pc + 2);
     CYCLES((!!(0xff00 & (et ^ ea))));
@@ -2407,13 +2406,13 @@ uint32_t s6502_exec(s6502_t *u, uint32_t cycles) {
     CYCLES(1);
     NEXT;
   _fc:
-    ea = READ16(pc);
+    ea = READX16(pc);
     pc = (pc + 2);
     READ8(ea);
     CYCLES(4);
     NEXT;
   _fd:
-    et = READ16(pc);
+    et = READX16(pc);
     ea = (et + ix);
     pc = (pc + 2);
     CYCLES((!!(0xff00 & (et ^ ea))));
@@ -2443,7 +2442,7 @@ uint32_t s6502_exec(s6502_t *u, uint32_t cycles) {
     CYCLES(4);
     NEXT;
   _fe:
-    et = READ16(pc);
+    et = READX16(pc);
     ea = (et + ix);
     pc = (pc + 2);
     dt = (READ8(ea) + 1);
@@ -2452,11 +2451,11 @@ uint32_t s6502_exec(s6502_t *u, uint32_t cycles) {
     CYCLES(7);
     NEXT;
   _ff:
-    ea = READ8(pc);
+    ea = READX8(pc);
     pc = (pc + 1);
     dt = READ8(ea);
     if (dt & (0x01 << 7)) {
-      ea = (pc + 1 + ((int8_t)(READ8(pc))));
+      ea = (pc + 1 + ((int8_t)(READX8(pc))));
       pc = (pc + 1);
       pc = ea;
     } else {
