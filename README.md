@@ -2,8 +2,10 @@
 
 
 本项目基于：
-* [BA4988 模拟器](https://gitee.com/BA4988/BBK-simulator)，作者：无云。
 
+* [BA4988 模拟器](https://gitee.com/BA4988/BBK-simulator)，作者：无云。
+* [vrEmu6502](https://github.com/visrealm/vrEmu6502) by Troy Schrapel, optimizing with computed goto and macros.
+* [sph-sc](https://github.com/sph-mn/sph-sc), generate C code with tidier scheme code.
 
 使用该核心需从词典导出字体和系统区的 ROM 文件：
 - 8.BIN (0x800000-0x9fffff)
