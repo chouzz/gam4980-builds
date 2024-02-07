@@ -648,6 +648,7 @@
          (pre-let*
           ,macros
           (let* ((executed uint32_t 0)
+                 (opcode uint8_t 0)
                  (dt uint8_t  0)
                  (et uint16_t 0)
                  (ea uint16_t 0)

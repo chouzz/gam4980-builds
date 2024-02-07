@@ -920,10 +920,14 @@ static void sys_step()
     uint32_t cycles = 0;
     while (cycles < 0x12000 * vars.cpu_rate) {
         if (sys.ram[_SYSCON] & 0x08) {
-            cycles += 400;
+            cycles += 400 * vars.cpu_rate;
         } else {
-            // XXX: 400 cycles step seems to be a safe value for SysHalt handling..
-            cycles += s6502_exec(&sys.cpu, 400);
+            for (int i = 0; i < vars.cpu_rate; i += 1) {
+                // XXX: 400 cycles step seems to be a safe value for SysHalt handling..
+                cycles += s6502_exec(&sys.cpu, 400);
+                if (sys.ram[_SYSCON] & 0x08)
+                    break;
+            }
         }
         sys_timer(vars.timer_rate);
         sys_isr();
