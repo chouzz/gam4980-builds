@@ -37,6 +37,7 @@
 #define _ST2LD          0x228
 #define _ST3LD          0x229
 #define _ST4LD          0x22a
+#define _MTCT           0x22b
 #define _STCTCON        0x22e
 #define _CTLD           0x22f
 #define _ALMMIN         0x230
@@ -707,8 +708,10 @@ static void sys_init(const char *romdir)
     sys.cpu.status = 0x04;
 
 
-    // Run initialize instructions.
-    s6502_exec(&sys.cpu, 0x10000);
+    // Run initialize instructions
+    // XXX: SysStart set _MTCT to 0xfe just before 'main'.
+    while (sys.ram[_MTCT] != 0xfe)
+        s6502_exec(&sys.cpu, 0x1000);
     sys.bk_sys_d = sys.bk_tab[0xd];
 
     if (sys.bk_sys_d == 0x0e88) { /* 4988 */
