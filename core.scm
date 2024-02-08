@@ -388,7 +388,7 @@
                    *ora *ab 4 'NEXT
                    *asl *ab 6 'NEXT
                    *bbr0 *zp 5 'NEXT
-                   *bpl *rel 2 'NEXT
+                   *bpl *rel 2 'EXIT
                    *ora *yip 5 'NEXT
                    *ora *zpi 5 'NEXT
                    *nop *imp 1 'NEXT
@@ -404,7 +404,7 @@
                    *ora *axp 4 'NEXT
                    *asl *axp 6 'NEXT
                    *bbr1 *zp 5 'NEXT
-                   *jsr *ab 6 'NEXT
+                   *jsr *ab 6 'EXIT
                    *and *xin 6 'NEXT
                    *ldd *imm 2 'NEXT
                    *nop *imp 1 'NEXT
@@ -420,7 +420,7 @@
                    *and *ab 4 'NEXT
                    *rol *ab 6 'NEXT
                    *bbr2 *zp 5 'NEXT
-                   *bmi *rel 2 'NEXT
+                   *bmi *rel 2 'EXIT
                    *and *yip 5 'NEXT
                    *and *zpi 5 'NEXT
                    *nop *imp 1 'NEXT
@@ -452,7 +452,7 @@
                    *eor *ab 4 'NEXT
                    *lsr *ab 6 'NEXT
                    *bbr4 *zp 5 'NEXT
-                   *bvc *rel 2 'NEXT
+                   *bvc *rel 2 'EXIT
                    *eor *yip 5 'NEXT
                    *eor *zpi 5 'NEXT
                    *nop *imp 1 'NEXT
@@ -480,11 +480,11 @@
                    *adc *imm 2 'NEXT
                    *ror/acc *acc 2 'NEXT
                    *nop *imp 1 'NEXT
-                   *jmp *ind 6 'NEXT
+                   *jmp *ind 6 'EXIT
                    *adc *ab 4 'NEXT
                    *ror *ab 6 'NEXT
                    *bbr6 *zp 5 'NEXT
-                   *bvs *rel 2 'NEXT
+                   *bvs *rel 2 'EXIT
                    *adc *yip 5 'NEXT
                    *adc *zpi 5 'NEXT
                    *nop *imp 1 'NEXT
@@ -496,11 +496,11 @@
                    *adc *ayp 4 'NEXT
                    *ply *imp 4 'NEXT
                    *nop *imp 1 'NEXT
-                   *jmp *indx 6 'NEXT
+                   *jmp *indx 6 'EXIT
                    *adc *axp 4 'NEXT
                    *ror *axp 6 'NEXT
                    *bbr7 *zp 5 'NEXT
-                   *bra *rel 2 'NEXT
+                   *bra *rel 2 'EXIT
                    *sta *xin 6 'NEXT
                    *ldd *imm 2 'NEXT
                    *nop *imp 1 'NEXT
@@ -516,7 +516,7 @@
                    *sta *ab 4 'NEXT
                    *stx *ab 4 'NEXT
                    *bbs0 *zp 5 'NEXT
-                   *bcc *rel 2 'NEXT
+                   *bcc *rel 2 'EXIT
                    *sta *yin 6 'NEXT
                    *sta *zpi 5 'NEXT
                    *nop *imp 1 'NEXT
@@ -548,7 +548,7 @@
                    *lda *ab 4 'NEXT
                    *ldx *ab 4 'NEXT
                    *bbs2 *zp 5 'NEXT
-                   *bcs *rel 2 'NEXT
+                   *bcs *rel 2 'EXIT
                    *lda *yip 5 'NEXT
                    *lda *zpi 5 'NEXT
                    *nop *imp 1 'NEXT
@@ -580,7 +580,7 @@
                    *cmp *ab 4 'NEXT
                    *dec *ab 6 'NEXT
                    *bbs4 *zp 5 'NEXT
-                   *bne *rel 2 'NEXT
+                   *bne *rel 2 'EXIT
                    *cmp *yip 5 'NEXT
                    *cmp *zpi 5 'NEXT
                    *nop *imp 1 'NEXT
@@ -612,7 +612,7 @@
                    *sbc *ab 4 'NEXT
                    *inc *ab 6 'NEXT
                    *bbs6 *zp 5 'NEXT
-                   *beq *rel 2 'NEXT
+                   *beq *rel 2 'EXIT
                    *sbc *yip 5 'NEXT
                    *sbc *zpi 5 'NEXT
                    *nop *imp 1 'NEXT
@@ -648,7 +648,6 @@
          (pre-let*
           ,macros
           (let* ((executed uint32_t 0)
-                 (opcode uint8_t 0)
                  (dt uint8_t  0)
                  (et uint16_t 0)
                  (ea uint16_t 0)

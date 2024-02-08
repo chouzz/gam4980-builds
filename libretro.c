@@ -70,7 +70,8 @@ static retro_input_state_t      input_state_cb;
 static retro_audio_sample_t     audio_cb;
 static uint16_t                 fb[(LCD_WIDTH + 1) * LCD_HEIGHT];
 
-static void sys_isr();
+static void sys_isr(void);
+static bool sys_halt_p(void);
 static void mem_bs(uint8_t sel);
 static uint8_t mem_read(uint16_t addr);
 static uint8_t mem_readx(uint16_t addr);
@@ -109,15 +110,20 @@ static struct {
     uint16_t     bk_sys_d;
 } sys;
 static struct {
-    uint8_t cpu_rate;
-    uint8_t timer_rate;
+    float cpu_rate;
+    float timer_rate;
     uint16_t lcd_bg;
     uint16_t lcd_fg;
-} vars = { 1, 1, 0xd6da, 0x0000 };
+} vars = { 1.0, 1.0, 0xd6da, 0x0000 };
 
 static void s6502_push(uint8_t val)
 {
     mem_write(0x100 | sys.cpu.sp--, val);
+}
+
+static bool sys_halt_p(void)
+{
+    return sys.ram[_SYSCON] & 0x08;
 }
 
 static inline uint32_t PA(uint16_t addr)
@@ -917,21 +923,24 @@ static void sys_isr()
 
 static void sys_step()
 {
-    uint32_t cycles = 0;
-    while (cycles < 0x12000 * vars.cpu_rate) {
-        if (sys.ram[_SYSCON] & 0x08) {
-            cycles += 400 * vars.cpu_rate;
+    static int32_t cycles = 0;
+    static uint32_t ticked = 0;
+    uint32_t tstep = 400 * vars.cpu_rate / vars.timer_rate;
+    cycles += vars.cpu_rate * 4000000 / 60;
+    while (ticked + tstep < cycles) {
+        if (sys_halt_p()) {
+            ticked += tstep;
+            sys_timer(1);
         } else {
-            for (int i = 0; i < vars.cpu_rate; i += 1) {
-                // XXX: 400 cycles step seems to be a safe value for SysHalt handling..
-                cycles += s6502_exec(&sys.cpu, 400);
-                if (sys.ram[_SYSCON] & 0x08)
-                    break;
-            }
+            uint32_t p = ticked / tstep;
+            sys_isr();
+            ticked += s6502_exec(&sys.cpu, 0x100);
+            uint32_t q = ticked / tstep;
+            sys_timer(q - p);
         }
-        sys_timer(vars.timer_rate);
-        sys_isr();
     }
+    cycles -= ticked;
+    ticked %= tstep;
 }
 
 static void fallback_log(enum retro_log_level level, const char *fmt, ...)
@@ -970,14 +979,14 @@ void retro_set_environment(retro_environment_t cb)
         {
             .key = "gam4980_cpu_rate",
             .desc = "CPU clock rate",
-            .values = {{"1"}, {"2"}, {"3"}, {"4"}, {"5"}, {"6"}, {"7"}, {"8"}, {NULL}},
-            .default_value = "1",
+            .values = {{"0.25"},{"0.50"},{"0.75"},{"1.00"},{"1.50"},{"2.00"},{"4.00"},{"8.00"},{NULL}},
+            .default_value = "1.00",
         },
         {
             .key = "gam4980_timer_rate",
             .desc = "Timer clock rate",
-            .values = {{"1"}, {"2"}, {"3"}, {"4"}, {"5"}, {"6"}, {"7"}, {"8"}, {NULL}},
-            .default_value = "1",
+            .values = {{"0.25"},{"0.50"},{"0.75"},{"1.00"},{"1.50"},{"2.00"},{"4.00"},{"8.00"},{NULL}},
+            .default_value = "1.00",
         },
         { NULL, NULL, NULL, {{0}}, NULL },
     };
@@ -1074,11 +1083,11 @@ static void apply_variables()
     }
     var.key = "gam4980_cpu_rate";
     if (environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE, &var))
-        vars.cpu_rate = atoi(var.value);
+        vars.cpu_rate = atof(var.value);
 
     var.key = "gam4980_timer_rate";
     if (environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE, &var))
-        vars.timer_rate = atoi(var.value);
+        vars.timer_rate = atof(var.value);
 }
 
 void retro_init(void)
@@ -1089,6 +1098,19 @@ void retro_init(void)
     snprintf(romdir, 512, "%s/gam4980", systemdir);
     sys_init(romdir);
     apply_variables();
+
+    // Support RetroArch cheats.
+    struct retro_memory_descriptor rmdesc = {
+        .flags = RETRO_MEMDESC_SYSTEM_RAM,
+        .start = 0,
+        .len   = sizeof(sys.ram),
+        .ptr   = sys.ram,
+    };
+    struct retro_memory_map rmmap = {
+        .descriptors = &rmdesc,
+        .num_descriptors = 1,
+    };
+    environ_cb(RETRO_ENVIRONMENT_SET_MEMORY_MAPS, &rmmap);
 }
 
 bool retro_load_game(const struct retro_game_info *game)
@@ -1179,19 +1201,48 @@ void retro_run(void)
     video_cb(fb, LCD_WIDTH, LCD_HEIGHT, 2 * LCD_WIDTH);
 }
 
+struct __attribute__((packed)) sys_state {
+    uint8_t ram[0x8000];
+    s6502_t cpu;
+    uint8_t bk_sel;
+    uint16_t bk_tab[16];
+    uint8_t flash_cmd;
+    uint8_t flash_cycles;
+};
+
 size_t retro_serialize_size(void)
 {
-    return 0;
+    return sizeof(struct sys_state);
 }
 
 bool retro_serialize(void *data, size_t size)
 {
-    return false;
+    struct sys_state state;
+    memcpy(&state.ram, sys.ram, sizeof(sys.ram));
+    state.cpu = sys.cpu;
+    state.bk_sel = sys.bk_sel;
+    for (int i = 0; i < 16; ++i)
+        state.bk_tab[i] = sys.bk_tab[i];
+    state.flash_cmd = sys.flash_cmd;
+    state.flash_cycles = sys.flash_cycles;
+    memcpy(data, &state, size);
+    return true;
 }
 
 bool retro_unserialize(const void *data, size_t size)
 {
-    return false;
+    struct sys_state state;
+    memcpy(&state, data, size);
+    memcpy(sys.ram, &state.ram, sizeof(sys.ram));
+    sys.cpu = state.cpu;
+    sys.bk_sel = state.bk_sel;
+    for (int i = 0; i < 16; ++i)
+        sys.bk_tab[i] = state.bk_tab[i];
+    sys.flash_cmd = state.flash_cmd;
+    sys.flash_cycles = state.flash_cycles;
+    for (int i = 0; i < 16; ++i)
+        mem_bs(i);
+    return true;
 }
 
 void retro_cheat_reset(void) {}
@@ -1216,6 +1267,8 @@ void *retro_get_memory_data(unsigned id)
     switch (id) {
     case RETRO_MEMORY_SAVE_RAM:
         return sys.flash;
+    case RETRO_MEMORY_SYSTEM_RAM:
+        return sys.ram;
     default:
         return NULL;
     }
@@ -1227,6 +1280,8 @@ size_t retro_get_memory_size(unsigned id)
     case RETRO_MEMORY_SAVE_RAM:
         // Saved: $000000-$00bfff, $1f8000-$1fffff
         return 0x14000;
+    case RETRO_MEMORY_SYSTEM_RAM:
+        return sizeof(sys.ram);
     default:
         return 0;
     }
