@@ -976,8 +976,8 @@ void retro_set_environment(retro_environment_t cb)
         {
             .key = "gam4980_lcd_color",
             .desc = "LCD color theme",
-            .values = {{"grey"}, {"green"}, {"blue"}, {"yellow"}, {NULL}},
-            .default_value = "grey",
+            .values = {{"grey"}, {"green"}, {"blue"}, {"yellow"}, {"random"}, {NULL}},
+            .default_value = "random",
         },
         {
             .key = "gam4980_lcd_ghosting",
@@ -1070,6 +1070,23 @@ void retro_get_system_av_info(struct retro_system_av_info *info)
     environ_cb(RETRO_ENVIRONMENT_SET_PIXEL_FORMAT, &pixfmt);
 }
 
+static bool lcd_color_ok()
+{
+    uint8_t bg_r = (vars.lcd_bg >> 11) & 0x1f;
+    uint8_t bg_g = (vars.lcd_bg >>  6) & 0x1f;
+    uint8_t bg_b = (vars.lcd_bg >>  0) & 0x1f;
+    uint8_t fg_r = (vars.lcd_fg >> 11) & 0x1f;
+    uint8_t fg_g = (vars.lcd_fg >>  6) & 0x1f;
+    uint8_t fg_b = (vars.lcd_fg >>  0) & 0x1f;
+
+    if (bg_r < fg_r + 18 ||
+        bg_g < fg_g + 18 ||
+        bg_b < fg_b + 18)
+        return false;
+
+    return true;
+}
+
 static void apply_variables()
 {
     struct retro_variable var = {0};
@@ -1088,6 +1105,11 @@ static void apply_variables()
         } else if (strcmp(var.value, "yellow") == 0) {
             vars.lcd_bg = 0xf72c;
             vars.lcd_fg = 0x2920;
+        } else if (strcmp(var.value, "random") == 0) {
+            do {
+                vars.lcd_bg = rand() % 0xffff;
+                vars.lcd_fg = rand() % 0xffff;
+            } while (!lcd_color_ok());
         }
     }
     var.key = "gam4980_lcd_ghosting";
