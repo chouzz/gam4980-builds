@@ -68,7 +68,9 @@ static retro_video_refresh_t    video_cb;
 static retro_input_poll_t       input_poll_cb;
 static retro_input_state_t      input_state_cb;
 static retro_audio_sample_t     audio_cb;
+static int8_t                   fa[(LCD_WIDTH + 1) * LCD_HEIGHT];
 static uint16_t                 fb[(LCD_WIDTH + 1) * LCD_HEIGHT];
+
 
 static void sys_isr(void);
 static bool sys_halt_p(void);
@@ -114,7 +116,8 @@ static struct {
     float timer_rate;
     uint16_t lcd_bg;
     uint16_t lcd_fg;
-} vars = { 1.0, 1.0, 0xd6da, 0x0000 };
+    uint8_t lcd_ghosting;
+} vars = { 1.0, 1.0, 0xd6da, 0x0000, 20 };
 
 static void s6502_push(uint8_t val)
 {
@@ -977,6 +980,12 @@ void retro_set_environment(retro_environment_t cb)
             .default_value = "grey",
         },
         {
+            .key = "gam4980_lcd_ghosting",
+            .desc = "LCD ghosting frames",
+            .values = {{"0"},{"5"},{"10"},{"15"},{"20"},{"25"},{"30"},{"35"},{"40"}},
+            .default_value = "15",
+        },
+        {
             .key = "gam4980_cpu_rate",
             .desc = "CPU clock rate",
             .values = {{"0.25"},{"0.50"},{"0.75"},{"1.00"},{"1.50"},{"2.00"},{"3.00"},{"4.00"},{"8.00"},{NULL}},
@@ -1042,7 +1051,7 @@ void retro_get_system_info(struct retro_system_info *info)
 {
     info->need_fullpath = false;
     info->valid_extensions = "gam";
-    info->library_version = "0.1";
+    info->library_version = "0.2";
     info->library_name = "gam4980";
     info->block_extract = false;
 }
@@ -1081,6 +1090,10 @@ static void apply_variables()
             vars.lcd_fg = 0x2920;
         }
     }
+    var.key = "gam4980_lcd_ghosting";
+    if (environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE, &var))
+        vars.lcd_ghosting = atoi(var.value);
+
     var.key = "gam4980_cpu_rate";
     if (environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE, &var))
         vars.cpu_rate = atof(var.value);
@@ -1144,8 +1157,39 @@ static inline void pp8(int y, int x, uint8_t p8)
 {
     // Draw 8 pixels.
     for (int i = 0; i < 8; i += 1) {
+        int z = y * (LCD_WIDTH + 1) + x * 8 + i;
         bool p = p8 & (1 << (7 - i));
-        fb[y * LCD_WIDTH + x * 8 + i] = p ? vars.lcd_fg : vars.lcd_bg;
+        fb[z] = p ? vars.lcd_fg : vars.lcd_bg;
+
+        if (vars.lcd_ghosting > 0) {
+            // LCD ghosting effect.
+            fa[z] += p ? 1 : -1;
+            if (fa[z] < 0)
+                fa[z] = 0;
+            if (fa[z] > vars.lcd_ghosting - 1)
+                fa[z] = vars.lcd_ghosting - 1;
+        }
+    }
+}
+
+static void blend_frame(void)
+{
+    uint8_t bg_r = (vars.lcd_bg >> 11) & 0x1f;
+    uint8_t bg_g = (vars.lcd_bg >>  6) & 0x1f;
+    uint8_t bg_b = (vars.lcd_bg >>  0) & 0x1f;
+    uint8_t fg_r = (vars.lcd_fg >> 11) & 0x1f;
+    uint8_t fg_g = (vars.lcd_fg >>  6) & 0x1f;
+    uint8_t fg_b = (vars.lcd_fg >>  0) & 0x1f;
+
+    for (int i = 0; i < LCD_HEIGHT; i += 1) {
+        for (int j = 0; j < LCD_WIDTH; j += 1) {
+            int z = i * (LCD_WIDTH + 1) + j;
+            float a = (float)fa[z] / vars.lcd_ghosting;
+            uint8_t mix_r = 0x1f & (uint8_t)((1 - a) * bg_r + a * fg_r);
+            uint8_t mix_g = 0x1f & (uint8_t)((1 - a) * bg_g + a * fg_g);
+            uint8_t mix_b = 0x1f & (uint8_t)((1 - a) * bg_b + a * fg_b);
+            fb[z] = mix_r << 11 | mix_g << 6 | mix_b;
+        }
     }
 }
 
@@ -1185,6 +1229,8 @@ void retro_run(void)
 
     // Draw the screen.
     uint8_t *v = sys.ram + 0x400;
+    sys.ram[0x400] = sys.ram[0x1000];
+
     for (int j = 65; j >= -30; j -= 1) {
         for (int i = 1; i < 20; i += 1) {
             pp8(j >= 0 ? j : (j * -1 + 65), i, *v++);
@@ -1197,8 +1243,10 @@ void retro_run(void)
         v += 31;
     }
     pp8(65, 0, sys.ram[0x0ff3]);
-    pp8(65, 1, sys.ram[0x1000]);
-    video_cb(fb, LCD_WIDTH, LCD_HEIGHT, 2 * LCD_WIDTH);
+
+    if (vars.lcd_ghosting > 0)
+        blend_frame();
+    video_cb(fb, LCD_WIDTH, LCD_HEIGHT, 2 * (LCD_WIDTH + 1));
 }
 
 struct __attribute__((packed)) sys_state {
