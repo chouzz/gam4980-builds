@@ -1,0 +1,81 @@
+name: Build libretro core for multiple platforms
+
+on:
+  push:
+    branches: ['**']
+  pull_request:
+    branches: ['**'] 
+
+jobs:
+  build:
+    strategy:
+      matrix:
+        platform: [x86_64, aarch64]
+        include:
+          - platform: x86_64
+            artifact_name: gam4980_libretro_x86_64.so
+            runner: ubuntu-22.04
+            arch: amd64
+            repo: "http://archive.ubuntu.com/ubuntu"
+          - platform: aarch64
+            artifact_name: gam4980_libretro_aarch64.so
+            runner: ubuntu-22.04-arm
+            arch: arm64
+            repo: "http://ports.ubuntu.com/ubuntu-ports"
+
+    runs-on: ${{ matrix.runner }}
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y make cmake libc6-dev libstdc++6 wget software-properties-common
+
+      - name: Add GCC-7 repository
+        run: |
+          # 添加Ubuntu 20.04 (Focal)仓库以获取GCC-7
+          echo "deb [arch=${{ matrix.arch }}] ${{ matrix.repo }} focal main universe" | sudo tee -a /etc/apt/sources.list.d/focal.list
+          sudo apt-key adv --keyserver keyserver.ubuntu.com --recv-keys 3B4FE6ACC0B21F32
+
+      - name: Install GCC-7
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y gcc-7 g++-7
+
+      - name: Set up environment
+        run: |
+          if [ "${{ matrix.platform }}" = "x86_64" ]; then
+            echo "CC=gcc-7" >> $GITHUB_ENV
+            echo "CXX=g++-7" >> $GITHUB_ENV
+            echo "STRIP=strip" >> $GITHUB_ENV
+            echo "CFLAGS=-O2 -fPIC" >> $GITHUB_ENV
+          else
+            echo "CC=gcc-7" >> $GITHUB_ENV
+            echo "CXX=g++-7" >> $GITHUB_ENV
+            echo "STRIP=strip" >> $GITHUB_ENV
+            echo "CFLAGS=-std=c11 -Wall -Ofast -march=armv8-a -mtune=cortex-a53 -fPIC " >> $GITHUB_ENV
+          fi
+
+      - name: Build with CMake
+        run: |
+          cmake -B build \
+            -DCMAKE_C_COMPILER=$CC \
+            -DCMAKE_CXX_COMPILER=$CXX \
+            -DCMAKE_STRIP=$STRIP \
+            -DCMAKE_C_FLAGS="$CFLAGS" \
+            -DLIBRETRO_STATIC=OFF
+          
+          cmake --build build -- -j$(nproc)
+
+      - name: Verify output
+        run: |
+          file build/gam4980_libretro.so
+          objdump -T build/gam4980_libretro.so | grep GLIBC_
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.artifact_name }}
+          path: build/gam4980_libretro.so
