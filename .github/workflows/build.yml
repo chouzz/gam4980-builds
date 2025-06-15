@@ -15,18 +15,18 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install -y software-properties-common
-          sudo add-apt-repository -y ppa:ubuntu-toolchain-r/test
-          sudo add-apt-repository -y "deb http://ports.ubuntu.com/ubuntu-ports jammy main universe"
+          sudo add-apt-repository -y "deb [arch=amd64] http://archive.ubuntu.com/ubuntu jammy main universe"
+          sudo add-apt-repository -y "deb [arch=arm64] http://ports.ubuntu.com/ubuntu-ports jammy main universe"
+          sudo dpkg --add-architecture arm64
           sudo apt-get update
-          sudo apt-get install -y gcc-8-aarch64-linux-gnu g++-8-aarch64-linux-gnu
+          sudo apt-get install -y gcc-8-aarch64-linux-gnu \
+                                 binutils-aarch64-linux-gnu
           sudo ln -sf /usr/bin/aarch64-linux-gnu-gcc-8 /usr/bin/aarch64-linux-gnu-gcc
-          sudo ln -sf /usr/bin/aarch64-linux-gnu-g++-8 /usr/bin/aarch64-linux-gnu-g++
 
       - name: Build with CMake
         run: |
           cmake -B build \
             -DCMAKE_C_COMPILER=aarch64-linux-gnu-gcc \
-            -DCMAKE_CXX_COMPILER=aarch64-linux-gnu-g++ \
             -DCMAKE_C_FLAGS="-march=armv8-a -mtune=cortex-a53 -O2 -fPIC" \
             -DLIBRETRO_STATIC=OFF
           cmake --build build -- -j$(nproc)
