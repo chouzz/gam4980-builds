@@ -1,0 +1,43 @@
+name: Build libretro core for TrimUI (GCC 8)
+
+on:
+  push:
+    branches: [ "master" ]
+
+jobs:
+  build:
+    runs-on: ubuntu-22.04
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Install GCC 8 cross-compiler
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y software-properties-common
+          sudo add-apt-repository -y ppa:ubuntu-toolchain-r/test
+          sudo add-apt-repository -y "deb http://ports.ubuntu.com/ubuntu-ports jammy main universe"
+          sudo apt-get update
+          sudo apt-get install -y gcc-8-aarch64-linux-gnu g++-8-aarch64-linux-gnu
+          sudo ln -sf /usr/bin/aarch64-linux-gnu-gcc-8 /usr/bin/aarch64-linux-gnu-gcc
+          sudo ln -sf /usr/bin/aarch64-linux-gnu-g++-8 /usr/bin/aarch64-linux-gnu-g++
+
+      - name: Build with CMake
+        run: |
+          cmake -B build \
+            -DCMAKE_C_COMPILER=aarch64-linux-gnu-gcc \
+            -DCMAKE_CXX_COMPILER=aarch64-linux-gnu-g++ \
+            -DCMAKE_C_FLAGS="-march=armv8-a -mtune=cortex-a53 -O2 -fPIC" \
+            -DLIBRETRO_STATIC=OFF
+          cmake --build build -- -j$(nproc)
+
+      - name: Verify output
+        run: |
+          file build/gam4980_libretro.so
+          aarch64-linux-gnu-objdump -T build/gam4980_libretro.so | grep GLIBC_
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: gam4980_libretro.so
+          path: build/gam4980_libretro.so
