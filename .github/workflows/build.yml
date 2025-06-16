@@ -17,7 +17,7 @@ jobs:
             repo: "http://archive.ubuntu.com/ubuntu"
           - platform: aarch64
             artifact_name: gam4980_libretro_aarch64.so
-            runner: ubuntu-22.04-arm64  # 使用原生ARM runner
+            runner: ubuntu-22.04-arm  # 使用原生ARM runner
             arch: arm64
             repo: "http://ports.ubuntu.com/ubuntu-ports"
 
