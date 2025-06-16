@@ -53,7 +53,7 @@ jobs:
             echo "CC=gcc-7" >> $GITHUB_ENV
             echo "CXX=g++-7" >> $GITHUB_ENV
             echo "STRIP=strip" >> $GITHUB_ENV
-            echo "CFLAGS=-march=armv8-a -mtune=cortex-a53 -O2 -fPIC" >> $GITHUB_ENV
+            echo "CFLAGS=-std=c11 -Wall -Ofast -march=armv8-a -mtune=cortex-a53 -fPIC " >> $GITHUB_ENV
           fi
 
       - name: Build with CMake
