@@ -1,4 +1,4 @@
-name: Build libretro core for TrimUI (Linaro GCC 8)
+name: Build libretro core for multiple platforms
 
 on:
   push:
@@ -6,7 +6,22 @@ on:
 
 jobs:
   build:
-    runs-on: ubuntu-22.04
+    strategy:
+      matrix:
+        platform: [x86_64, aarch64]
+        include:
+          - platform: x86_64
+            artifact_name: gam4980_libretro_x86_64.so
+            runner: ubuntu-22.04
+            arch: amd64
+            repo: "http://archive.ubuntu.com/ubuntu"
+          - platform: aarch64
+            artifact_name: gam4980_libretro_aarch64.so
+            runner: ubuntu-22.04-arm64  # 使用原生ARM runner
+            arch: arm64
+            repo: "http://ports.ubuntu.com/ubuntu-ports"
+
+    runs-on: ${{ matrix.runner }}
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -14,44 +29,51 @@ jobs:
       - name: Install dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install -y make cmake libc6-dev libstdc++6
+          sudo apt-get install -y make cmake libc6-dev libstdc++6 wget software-properties-common
 
-      - name: Install Linaro GCC 8 toolchain
+      - name: Add GCC-7 repository
         run: |
-          # 下载并安装 Linaro GCC 8.5 工具链
-          wget https://releases.linaro.org/components/toolchain/binaries/8.5-2019.12/aarch64-linux-gnu/gcc-linaro-8.5.0-2019.12-x86_64_aarch64-linux-gnu.tar.xz
-          sudo mkdir -p /opt/linaro
-          sudo tar -xJf gcc-linaro-8.5.0-2019.12-x86_64_aarch64-linux-gnu.tar.xz -C /opt/linaro
-          echo "/opt/linaro/gcc-linaro-8.5.0-2019.12-x86_64_aarch64-linux-gnu/bin" >> $GITHUB_PATH
-          echo "export PATH=/opt/linaro/gcc-linaro-8.5.0-2019.12-x86_64_aarch64-linux-gnu/bin:\$PATH" >> $GITHUB_ENV
-          echo "Toolchain installed to /opt/linaro/gcc-linaro-8.5.0-2019.12-x86_64_aarch64-linux-gnu"
+          # 添加Ubuntu 20.04 (Focal)仓库以获取GCC-7
+          echo "deb [arch=${{ matrix.arch }}] ${{ matrix.repo }} focal main universe" | sudo tee -a /etc/apt/sources.list.d/focal.list
+          sudo apt-key adv --keyserver keyserver.ubuntu.com --recv-keys 3B4FE6ACC0B21F32
 
-      - name: Verify toolchain
+      - name: Install GCC-7
         run: |
-          aarch64-linux-gnu-gcc --version
-          which aarch64-linux-gnu-gcc
+          sudo apt-get update
+          sudo apt-get install -y gcc-7 g++-7
+
+      - name: Set up environment
+        run: |
+          if [ "${{ matrix.platform }}" = "x86_64" ]; then
+            echo "CC=gcc-7" >> $GITHUB_ENV
+            echo "CXX=g++-7" >> $GITHUB_ENV
+            echo "STRIP=strip" >> $GITHUB_ENV
+            echo "CFLAGS=-O2 -fPIC" >> $GITHUB_ENV
+          else
+            echo "CC=gcc-7" >> $GITHUB_ENV
+            echo "CXX=g++-7" >> $GITHUB_ENV
+            echo "STRIP=strip" >> $GITHUB_ENV
+            echo "CFLAGS=-march=armv8-a -mtune=cortex-a53 -O2 -fPIC" >> $GITHUB_ENV
+          fi
 
       - name: Build with CMake
         run: |
-          export CC=/opt/linaro/gcc-linaro-8.5.0-2019.12-x86_64_aarch64-linux-gnu/bin/aarch64-linux-gnu-gcc
-          export STRIP=/opt/linaro/gcc-linaro-8.5.0-2019.12-x86_64_aarch64-linux-gnu/bin/aarch64-linux-gnu-strip
-          
           cmake -B build \
-            -DCMAKE_SYSTEM_NAME=Linux \
-            -DCMAKE_SYSTEM_PROCESSOR=aarch64 \
-            -DCMAKE_C_COMPILER=${CC} \
-            -DCMAKE_STRIP=${STRIP} \
-            -DCMAKE_C_FLAGS="-march=armv8-a -mtune=cortex-a53 -O2 -fPIC" \
+            -DCMAKE_C_COMPILER=$CC \
+            -DCMAKE_CXX_COMPILER=$CXX \
+            -DCMAKE_STRIP=$STRIP \
+            -DCMAKE_C_FLAGS="$CFLAGS" \
             -DLIBRETRO_STATIC=OFF
+          
           cmake --build build -- -j$(nproc)
 
       - name: Verify output
         run: |
           file build/gam4980_libretro.so
-          /opt/linaro/gcc-linaro-8.5.0-2019.12-x86_64_aarch64-linux-gnu/bin/aarch64-linux-gnu-objdump -T build/gam4980_libretro.so | grep GLIBC_
+          objdump -T build/gam4980_libretro.so | grep GLIBC_
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
-          name: gam4980_libretro.so
+          name: ${{ matrix.artifact_name }}
           path: build/gam4980_libretro.so
