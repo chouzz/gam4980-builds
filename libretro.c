@@ -1249,6 +1249,8 @@ void retro_run(void)
 
     sys_step();
 
+    memset(fb, 0, LCD_WIDTH * LCD_HEIGHT * sizeof(uint16_t));
+    
     // Draw the screen.
     uint8_t *v = sys.ram + 0x400;
     sys.ram[0x400] = sys.ram[0x1000];
