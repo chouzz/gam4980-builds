@@ -1303,8 +1303,31 @@ bool retro_serialize(void *data, size_t size)
 
 bool retro_unserialize(const void *data, size_t size)
 {
+    // 添加调试日志
+    snprintf(stderr, "gam4980: Loading state, size=%zu, expected=%zu\n", 
+            size, sizeof(struct sys_state));
+    
+    if (!data || size != sizeof(struct sys_state)) {
+        snprintf(stderr, "gam4980: State load failed - invalid size\n");
+        return false;
+    }
+    
     struct sys_state state;
     memcpy(&state, data, size);
+    
+    // 添加数据合理性检查
+    if (state.bk_sel >= 16) {
+        snprintf(stderr, "gam4980: Invalid bk_sel value: %d\n", state.bk_sel);
+        return false;
+    }
+    
+    // 检查CPU状态是否合理
+    if (state.cpu.PC > 0xFFFF) {
+        snprintf(stderr, "gam4980: Invalid CPU PC: 0x%X\n", state.cpu.PC);
+        return false;
+    }
+    
+    // 恢复状态
     memcpy(sys.ram, &state.ram, sizeof(sys.ram));
     sys.cpu = state.cpu;
     sys.bk_sel = state.bk_sel;
@@ -1312,8 +1335,12 @@ bool retro_unserialize(const void *data, size_t size)
         sys.bk_tab[i] = state.bk_tab[i];
     sys.flash_cmd = state.flash_cmd;
     sys.flash_cycles = state.flash_cycles;
+    
+    // 重新初始化内存映射
     for (int i = 0; i < 16; ++i)
         mem_bs(i);
+    
+    fprintf(stderr, "gam4980: State loaded successfully\n");
     return true;
 }
 
